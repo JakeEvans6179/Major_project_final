@@ -8,7 +8,7 @@ load eligible houses, check against hard filters, sample 100, and plot for manua
 '''
 
 # --- 1. CONFIGURATION ---
-data_path = Path("selected_households_raw.parquet")
+data_path = Path("../01_data_preparation/eligible_households_raw.parquet")
 plots_dir = Path("stage1_qa_plots")
 plots_dir.mkdir(exist_ok=True)
 SEED = 6769

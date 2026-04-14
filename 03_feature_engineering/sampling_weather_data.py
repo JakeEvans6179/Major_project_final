@@ -6,7 +6,7 @@ from pathlib import Path
 Extract weather data and clean/ apply forward filling
 '''
 # folder containing all partitioned CSVs
-data_folder = Path(r"../Datasets/weather_data")
+data_folder = Path("../data/weather_data")
 WINDOW_DURATION = 789
 
 out_parquet = Path("weather_data.parquet")

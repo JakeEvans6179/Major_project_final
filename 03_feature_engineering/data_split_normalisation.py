@@ -14,17 +14,27 @@ Returns Global scaler csv for temp and humidity + local household scaler csv for
 *these files can be used to train and run inference*
 '''
 
-hourly_path = Path("selected_100.parquet")
+hourly_path = Path("household_weather_merged.parquet")
 
 df = pd.read_parquet(hourly_path)
 
+#Need 365 days for test set, the remaining 424 days can be split into train and val sets (80/20 split)
 
+TRAIN_DAYS = 339
+VAL_DAYS = 85
+TEST_DAYS = 365
 
-train_ratio = 0.7
-val_ratio = 0.2
-test_ratio = 0.1
+assert TRAIN_DAYS + VAL_DAYS + TEST_DAYS == 789
 
-assert abs(train_ratio + val_ratio + test_ratio -1) < 1e-9   #make sure it adds up to 100%
+HOURS_PER_DAY = 24
+
+TRAIN_LEN = TRAIN_DAYS * HOURS_PER_DAY
+VAL_LEN = VAL_DAYS * HOURS_PER_DAY
+TEST_LEN = TEST_DAYS * HOURS_PER_DAY
+
+print("Train hours:", TRAIN_LEN)
+print("Val hours:", VAL_LEN)
+print("Test hours:", TEST_LEN)
 
 
 df["DateTime"] = pd.to_datetime(df["DateTime"], errors="coerce") #set to DateTime object
@@ -50,8 +60,11 @@ for house_id in house_ids:
     house = df[df["LCLid"] == house_id].copy().sort_values("DateTime")
 
     n = len(house)
-    train_end = int(n * train_ratio)
-    val_end = int(n * (train_ratio + val_ratio))
+
+    assert n == TRAIN_LEN + VAL_LEN + TEST_LEN, f"{house_id}: unexpected row count {n}"
+    
+    train_end = TRAIN_LEN
+    val_end = TRAIN_LEN + VAL_LEN
 
     train_df = house.iloc[:train_end].copy()
     val_df = house.iloc[train_end:val_end].copy()
@@ -149,39 +162,6 @@ for house_id in house_ids:
         house_splits[house_id]["test"]["humidity"], global_hum_min, global_hum_max)
 
 
-train_list = []
-val_list = []
-test_list = []
-
-#Loop through every house and append its chunks to the correct list
-#used later for centralised training
-# --- For Later ---
-for h in house_ids:
-    train_list.append(house_splits[h]["train"])
-    val_list.append(house_splits[h]["val"])
-    test_list.append(house_splits[h]["test"])
-
-#print(train_list)
-#connect the populated lists together into one dataframe
-train_all = pd.concat(train_list, ignore_index=True)
-val_all = pd.concat(val_list, ignore_index=True)
-test_all = pd.concat(test_list, ignore_index=True)
-
-print("\nTrain shape:", train_all.shape)
-print("Val shape:", val_all.shape)
-print("Test shape:", test_all.shape)
-
-
-print(train_all)
-
-#sanity check, min = 0, max = 1
-print("\nScaled train temperature range:")
-print(train_all["temperature"].min(), train_all["temperature"].max())
-
-print("\nScaled train humidity range:")
-print(train_all["humidity"].min(), train_all["humidity"].max())
-
-# ------
 
 print("\nExample one house split sizes:")
 example_house = house_ids[0]
@@ -216,7 +196,20 @@ print(splits_df)
 print(splits_df.shape)
 print(splits_df["split"].value_counts())
 
-splits_df.to_parquet("selected_100_normalised_ph.parquet", index=False)
+#sanity check, make sure between 0 and 1
+print("\nScaled train temperature range:")
+print(splits_df.loc[splits_df["split"] == "train", "temperature"].min(),
+      splits_df.loc[splits_df["split"] == "train", "temperature"].max())
+
+print("\nScaled train humidity range:")
+print(splits_df.loc[splits_df["split"] == "train", "humidity"].min(),
+      splits_df.loc[splits_df["split"] == "train", "humidity"].max())
+
+print("\nScaled train kwh range:")
+print(splits_df.loc[splits_df["split"] == "train", "kwh"].min(),
+      splits_df.loc[splits_df["split"] == "train", "kwh"].max())
+
+splits_df.to_parquet("final_locked_100_normalised.parquet", index=False)
 
 pd.DataFrame({
     "global_temp_min": [global_temp_min],

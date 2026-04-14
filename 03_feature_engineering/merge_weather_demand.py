@@ -24,8 +24,8 @@ Normalise in next script
 # --------------------------------------------------
 # CONFIG
 # --------------------------------------------------
-raw_parquet = Path("selected_households_raw.parquet")
-out_parquet = Path("household_weathher_merged.parquet")
+raw_parquet = Path("../02_household_selection/final_locked_100.parquet")
+out_parquet = Path("household_weather_merged.parquet")
 
 WINDOW_DURATION = 789
 
@@ -178,6 +178,3 @@ hourly_df.to_parquet(out_parquet, index=False)
 print(f"\nSaved processed hourly data to: {out_parquet}")
 
 
-'''
-Now apply min max scaling and organise data into training, validation and test splits and perform training
-'''

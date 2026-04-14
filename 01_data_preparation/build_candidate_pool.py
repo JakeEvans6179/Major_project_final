@@ -273,7 +273,7 @@ window_stats.to_csv("window_stats_fixed800d.csv", index=False)
 
 '''
 #save to parquet for training script to use
-selected_houses.to_parquet("selected_households_raw.parquet", index=False)
+selected_houses.to_parquet("eligible_households_raw.parquet", index=False)
 
 
 

@@ -8,7 +8,7 @@ remove houses with corrupted data sampled in previous stage and resample replace
 '''
 
 # --- 1. CONFIGURATION ---
-data_path = Path("selected_households_raw.parquet")              # full raw candidate pool
+data_path = Path("../01_data_preparation/eligible_households_raw.parquet")              # full raw candidate pool
 original_sample_path = Path("stage_1_100households.parquet")     # raw data for original sampled 100
 plots_dir = Path("stage2_qa_plots")
 plots_dir.mkdir(exist_ok=True)

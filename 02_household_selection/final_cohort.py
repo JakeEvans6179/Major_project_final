@@ -7,7 +7,7 @@ Build the final cohort of 100 locked households.
 '''
 
 # --- 1. PATHS ---
-raw_data_path = Path("selected_households_raw.parquet")
+raw_data_path = Path("../01_data_preparation/eligible_households_raw.parquet")
 original_sample_path = Path("stage_1_100households.parquet")
 
 output_ids_path = Path("final_locked_100_ids.csv")

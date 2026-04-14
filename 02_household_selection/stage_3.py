@@ -7,7 +7,7 @@ from pathlib import Path
 Sample new replacement candidates for stage 3.
 '''
 # --- 1. CONFIGURATION ---
-data_path = Path("selected_households_raw.parquet")              # full raw candidate pool
+data_path = Path("../01_data_preparation/eligible_households_raw.parquet")              # full raw candidate pool
 original_sample_path = Path("stage_1_100households.parquet")     # raw data for original sampled 100
 stage2_ids_path = Path("stage2_replacement_candidates.csv")      # 22 stage 2 candidate IDs
 plots_dir = Path("stage3_qa_plots")
