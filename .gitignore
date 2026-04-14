@@ -1,0 +1,35 @@
+# Ignore Python Cache
+__pycache__/
+*.py[cod]
+
+# Ignore Virtual Environments
+venv/
+env/
+.venv/
+
+# Ignore Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
+
+
+*.parquet
+*.csv 
+
+*.Identifier
+
+# Ignore Saved Models and Weights
+*.keras
+*.h5
+*.pb
+
+# Ignore generated plot images
+house_full_usage_plots/
+train_val_curve/
+*.png
+
+
+*.npz
+
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db

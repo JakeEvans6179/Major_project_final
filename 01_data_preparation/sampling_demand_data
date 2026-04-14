@@ -1,0 +1,315 @@
+from pathlib import Path
+import sqlite3
+import gc
+import numpy as np
+import pandas as pd
+
+"""
+**Step 1**
+
+Script for accessing household data and filtering
+Filter out ToU and only use standard tarrif data
+
+Remove duplicate readings, calculate total duration of each house and compute coverage ratio (ratio of valid readings/ total expected readings)
+
+Enabling us to select list of 100 suitable households for running testing on
+
+
+Robust household filtering pipeline using SQLite staging.
+
+Goal:
+- produce the same final selected_100_households_raw.parquet logic
+- avoid loading the full raw dataset into memory at once
+
+**functionally identical to sample_weather_data** ie step 1
+"""
+
+# --------------------------------------------------
+# CONFIG
+# --------------------------------------------------
+data_folder = Path(r"Partitioned LCL Data")
+db_path = Path("household_pipeline.db")
+
+selected_out = Path("selected_100_households_raw.parquet")
+selected_ids_out = Path("selected_100_houses_fixed_window.csv")
+good_houses_out = Path("good_houses_fixed_window.csv")
+window_stats_out = Path("window_stats_fixed_window.csv")
+household_stats_out = Path("household_stats_all.csv")
+
+WINDOW_DURATION = 423
+common_end = pd.Timestamp("2014-02-28 00:00:00")
+common_start = common_end - pd.Timedelta(days=WINDOW_DURATION)
+tolerance = pd.Timedelta(minutes=30)
+
+expected_count = WINDOW_DURATION * 48 + 1  # 30-min expected timestamps in inclusive window
+
+CHUNKSIZE = 1_000_000
+
+print("Common start:", common_start)
+print("Common end:", common_end)
+print("Expected timestamps per house:", expected_count)
+
+# --------------------------------------------------
+# HELPERS
+# --------------------------------------------------
+def normalise_datetime(series: pd.Series) -> pd.Series:
+    dt = pd.to_datetime(series, errors="coerce")
+    return dt.dt.strftime("%Y-%m-%d %H:%M:%S")
+
+def load_and_stage_raw_csvs(conn: sqlite3.Connection):
+    """
+    Read CSVs in chunks, filter and clean each chunk, and append to SQLite.
+    This avoids holding the full raw dataset in memory.
+    """
+    csv_files = sorted(data_folder.rglob("*.csv"))
+    print(f"Found {len(csv_files)} CSV files")
+
+    conn.execute("DROP TABLE IF EXISTS raw_stage")
+    conn.execute("""
+        CREATE TABLE raw_stage (
+            LCLid TEXT,
+            DateTime TEXT,
+            kwh REAL
+        )
+    """)
+    conn.commit()
+
+    total_inserted = 0
+
+    for i, f in enumerate(csv_files, start=1):
+        print(f"\nLoading {i}/{len(csv_files)}: {f.name}")
+
+        for chunk_idx, chunk in enumerate(pd.read_csv(
+            f,
+            usecols=["LCLid", "stdorToU", "DateTime", "KWH/hh (per half hour) "],
+            chunksize=CHUNKSIZE,
+            low_memory=False
+        ), start=1):
+            print(f"  chunk {chunk_idx}")
+
+            chunk = chunk.rename(columns={"KWH/hh (per half hour) ": "kwh"})
+
+            # Keep only standard tariff
+            chunk = chunk[chunk["stdorToU"] == "Std"].copy()
+
+            # Convert types
+            dt = pd.to_datetime(chunk["DateTime"], errors="coerce")
+            chunk["kwh"] = pd.to_numeric(chunk["kwh"], errors="coerce", downcast="float")
+
+            # Remove off-grid timestamps here (equivalent to doing it later globally)
+            on_grid_mask = (
+                dt.dt.minute.isin([0, 30]) &
+                (dt.dt.second == 0)
+            )
+
+            chunk = chunk[on_grid_mask].copy()
+            dt = dt[on_grid_mask]
+
+            # Store standardised datetime text
+            chunk["DateTime"] = dt.dt.strftime("%Y-%m-%d %H:%M:%S")
+
+            # Drop tariff column
+            chunk = chunk[["LCLid", "DateTime", "kwh"]]
+
+            # Drop rows with invalid datetime text (original code would lose these at off-grid step anyway)
+            chunk = chunk[chunk["DateTime"].notna()].copy()
+
+            # Optional memory savings
+            chunk["LCLid"] = chunk["LCLid"].astype(str)
+
+            # Append chunk to SQLite
+            chunk.to_sql("raw_stage", conn, if_exists="append", index=False)
+
+            total_inserted += len(chunk)
+
+            del chunk, dt
+            gc.collect()
+
+    print(f"\nTotal staged rows (before global DISTINCT): {total_inserted}")
+
+def build_distinct_sorted_table(conn: sqlite3.Connection):
+    """
+    Remove exact duplicates globally and create a sorted cleaned table.
+    """
+    conn.execute("DROP TABLE IF EXISTS cleaned")
+    conn.execute("""
+        CREATE TABLE cleaned AS
+        SELECT DISTINCT
+            LCLid,
+            DateTime,
+            kwh
+        FROM raw_stage
+    """)
+    conn.commit()
+
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_cleaned_lclid_datetime ON cleaned(LCLid, DateTime)")
+    conn.commit()
+
+    raw_count = conn.execute("SELECT COUNT(*) FROM raw_stage").fetchone()[0]
+    clean_count = conn.execute("SELECT COUNT(*) FROM cleaned").fetchone()[0]
+
+    print("\nRows before DISTINCT:", raw_count)
+    print("Rows after DISTINCT:", clean_count)
+    print("Duplicates removed:", raw_count - clean_count)
+
+def get_household_stats(conn: sqlite3.Connection) -> pd.DataFrame:
+    """
+    Household stats across full cleaned table.
+    """
+    query = """
+    SELECT
+        LCLid AS Household_id,
+        MIN(DateTime) AS First_timestep,
+        MAX(DateTime) AS Last_timestep,
+        COUNT(kwh) AS Valid_count
+    FROM cleaned
+    GROUP BY LCLid
+    ORDER BY LCLid
+    """
+    household_stats = pd.read_sql_query(query, conn)
+    household_stats["First_timestep"] = pd.to_datetime(household_stats["First_timestep"])
+    household_stats["Last_timestep"] = pd.to_datetime(household_stats["Last_timestep"])
+
+    household_stats["Total_count"] = (
+        ((household_stats["Last_timestep"] - household_stats["First_timestep"]).dt.total_seconds() / (30 * 60))
+        .round()
+        .astype(int) + 1
+    )
+
+    household_stats["Coverage"] = household_stats["Valid_count"] / household_stats["Total_count"]
+    household_stats["Span_days"] = (
+        (household_stats["Last_timestep"] - household_stats["First_timestep"]).dt.total_seconds()
+        / (24 * 60 * 60)
+    )
+
+    return household_stats
+
+def get_window_stats(conn: sqlite3.Connection, eligible_ids: list[str]) -> pd.DataFrame:
+    """
+    Coverage stats inside the fixed window for eligible houses only.
+    """
+    conn.execute("DROP TABLE IF EXISTS eligible_houses")
+    conn.execute("CREATE TEMP TABLE eligible_houses (Household_id TEXT PRIMARY KEY)")
+    conn.executemany(
+        "INSERT INTO eligible_houses (Household_id) VALUES (?)",
+        [(hid,) for hid in eligible_ids]
+    )
+    conn.commit()
+
+    query = f"""
+    SELECT
+        c.LCLid AS Household_id,
+        COUNT(c.kwh) AS Valid_count,
+        COUNT(DISTINCT c.DateTime) AS Unique_timestamps
+    FROM cleaned c
+    JOIN eligible_houses e
+      ON c.LCLid = e.Household_id
+    WHERE c.DateTime >= '{common_start.strftime("%Y-%m-%d %H:%M:%S")}'
+      AND c.DateTime <= '{common_end.strftime("%Y-%m-%d %H:%M:%S")}'
+    GROUP BY c.LCLid
+    ORDER BY c.LCLid
+    """
+    window_stats = pd.read_sql_query(query, conn)
+
+    window_stats["Total_count"] = expected_count
+    window_stats["Coverage"] = window_stats["Valid_count"] / window_stats["Total_count"]
+    window_stats["Timestamp_coverage"] = window_stats["Unique_timestamps"] / window_stats["Total_count"]
+
+    return window_stats
+
+def get_selected_houses_df(conn: sqlite3.Connection, selected_ids: list[str]) -> pd.DataFrame:
+    """
+    Pull final selected rows in the same sorted order as original logic:
+    sorted by LCLid, DateTime.
+    """
+    conn.execute("DROP TABLE IF EXISTS selected_houses")
+    conn.execute("CREATE TEMP TABLE selected_houses (Household_id TEXT PRIMARY KEY)")
+    conn.executemany(
+        "INSERT INTO selected_houses (Household_id) VALUES (?)",
+        [(hid,) for hid in selected_ids]
+    )
+    conn.commit()
+
+    query = f"""
+    SELECT
+        c.LCLid,
+        c.DateTime,
+        c.kwh
+    FROM cleaned c
+    JOIN selected_houses s
+      ON c.LCLid = s.Household_id
+    WHERE c.DateTime >= '{common_start.strftime("%Y-%m-%d %H:%M:%S")}'
+      AND c.DateTime <= '{common_end.strftime("%Y-%m-%d %H:%M:%S")}'
+    ORDER BY c.LCLid, c.DateTime
+    """
+    selected_df = pd.read_sql_query(query, conn)
+    selected_df["DateTime"] = pd.to_datetime(selected_df["DateTime"])
+    return selected_df
+
+# --------------------------------------------------
+# RUN PIPELINE
+# --------------------------------------------------
+with sqlite3.connect(db_path) as conn:
+    load_and_stage_raw_csvs(conn)
+    build_distinct_sorted_table(conn)
+
+    print("\nCalculating household stats")
+    household_stats = get_household_stats(conn)
+    household_stats.to_csv(household_stats_out, index=False)
+
+    print("\nHousehold stats summary:")
+    print(household_stats.head())
+    print("Total houses:", len(household_stats))
+
+    print("\nTesting window coverage")
+    valid_houses = household_stats[
+        (household_stats["First_timestep"] <= common_start + tolerance) &
+        (household_stats["Last_timestep"] >= common_end - tolerance)
+    ].copy()
+
+    print("Houses fully covering fixed window:", len(valid_houses))
+
+    eligible_ids = valid_houses["Household_id"].tolist()
+    window_stats = get_window_stats(conn, eligible_ids)
+    window_stats.to_csv(window_stats_out, index=False)
+
+    print("\nFixed-window household stats:")
+    print(window_stats.head())
+    print(window_stats["Coverage"].describe())
+
+    good_houses = window_stats[window_stats["Coverage"] > 0.99].copy()
+    good_houses.to_csv(good_houses_out, index=False)
+
+    print("\nGood houses after fixed-window filter:", len(good_houses))
+    print(good_houses.head())
+
+    print("\nRandomly selecting household IDs from eligible list")
+    if len(good_houses) < 100:
+        raise ValueError("Too few eligible houses to sample")
+
+    # Keep ordering deterministic and aligned with previous logic
+    good_houses = good_houses.sort_values("Household_id").reset_index(drop=True)
+
+    rng = np.random.default_rng(6769)
+    selected_ids = rng.choice(
+        good_houses["Household_id"].to_numpy(),
+        size=100,
+        replace=False
+    )
+
+    selected_100 = pd.DataFrame({"Household_id": selected_ids})
+    selected_100.to_csv(selected_ids_out, index=False)
+
+    print(selected_100.head())
+    print("Selected houses:", len(selected_100))
+
+    selected_houses = get_selected_houses_df(conn, selected_ids.tolist())
+
+print("\nSelected raw rows:")
+print(selected_houses.head())
+print("Unique selected houses:", selected_houses["LCLid"].nunique())
+print("Selected raw shape:", selected_houses.shape)
+
+# Final parquet output: same intended final output as original script
+selected_houses.to_parquet(selected_out, index=False)
+print(f"\nSaved final selected parquet to: {selected_out}")
