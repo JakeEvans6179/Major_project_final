@@ -15,7 +15,7 @@ import Helper_functions
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
 '''
-LSTM64_32 validation metrics
+LSTM64x32 validation metrics
 
 Load global model, calculate original metrics (RMSE, MAE on validation set)
 
@@ -30,7 +30,7 @@ max_min_path = Path("../../03_feature_engineering/global_weather_scaler.csv")
 
 local_kwh_scaling = Path("../../03_feature_engineering/local_kwh_scaler.csv")
 
-global_model_path = Path("models/LSTM64_32_global.keras" )  #load the global model
+global_model_path = Path("models/LSTM64x32_global.keras" )  #load the global model
 
 
 HORIZON = 6
@@ -169,7 +169,7 @@ for i, house_id in enumerate(house_ids, start = 1):
 
 results_df = pd.DataFrame(results)
 
-results_df.to_csv("fine_tuned_LSTM64_32_per_house_eval.csv", index=False)
+results_df.to_csv("fine_tuned_LSTM64x32_per_house_eval.csv", index=False)
 
 print("Mean RMSE across horizons centralised:", results_df["centralised_mean_rmse"].mean())
 print("Median RMSE across horizons centralised:", results_df["centralised_mean_rmse"].median())
@@ -199,7 +199,7 @@ print("Houses worsened in MAE:", (results_df["delta_mae"] < 0).sum())
 
 
 summary_df = pd.DataFrame([{
-    "model": "fine_tuned_LSTM64_32",
+    "model": "fine_tuned_LSTM64x32",
     "Mean RMSE across horizons centralised": results_df["centralised_mean_rmse"].mean(),
     "Median RMSE across horizons centralised": results_df["centralised_mean_rmse"].median(),
     "Mean MAE across horizons centralised": results_df["centralised_mean_mae"].mean(),
@@ -224,5 +224,5 @@ summary_df = pd.DataFrame([{
     
 }])
 
-summary_df.to_csv("fine_tuned_LSTM64_32_summary.csv", index=False)
+summary_df.to_csv("fine_tuned_LSTM64x32_summary.csv", index=False)
 print(summary_df)

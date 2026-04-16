@@ -8,7 +8,7 @@ python3.10 -m venv .venv
 source .venv/bin/activate
  
 #Install TensorFlow, Project Libraries, and Matplotlib
-pip install tensorflow==2.15.0 pandas numpy scikit-learn pyarrow tqdm matplotlib
+pip install tensorflow==2.15.0 pandas numpy scikit-learn pyarrow tqdm matplotlib scikit-learn statsmodels
  
 #Install Flower Federated Learning (lock keras version to 2.15.0)
 pip install "flwr[simulation]==1.7.0" "keras<2.16"

@@ -68,14 +68,14 @@ def train_model(X_train, y_train, X_val, y_val, global_model):
 
     es = EarlyStopping(
         monitor="val_loss",
-        patience=5,
+        patience=10,
         restore_best_weights=True
     )
 
     history = model.fit(
         X_train, y_train,
         validation_data=(X_val, y_val),
-        epochs=60,
+        epochs=100,
         batch_size=256,
         verbose=1,
         callbacks=[es]
