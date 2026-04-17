@@ -15,7 +15,7 @@ import Helper_functions
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
 '''
-CNN_LSTM validation metrics (Federated fine tuning)
+LSTM64_Dense validation metrics (Federated fine tuning)
 
 Load global model, calculate original metrics (RMSE, MAE on validation set)
 
@@ -24,17 +24,12 @@ Carry out fine tuning, calculate new metrics (RMSE, MAE on validation set)
 Compare to see if there is any improvement
 '''
 
-plots_dir = Path("train_val_curve")
-plots_dir.mkdir(exist_ok=True) # This creates the folder if it doesn't exist
 
+data_path = Path("../data_files/final_locked_100_normalised.parquet")
+max_min_path = Path("../data_files/global_weather_scaler.csv")
+local_kwh_scaling = Path("../data_files/local_kwh_scaler.csv")
 
-data_path = Path("selected_100_normalised_ph.parquet")
-
-max_min_path = Path("global_weather_scaler.csv")
-
-local_kwh_scaling = Path("local_kwh_scaler.csv")
-
-global_model_path = "chunk_checkpoints/global_chunk_031_CNN_LSTM.keras"  #find the best model from validation screening and use for fine tuning
+global_model_path = Path("chunk_checkpoints/global_chunk_038_LSTM64_Dense.keras")  #find the best model from validation screening and use for fine tuning
 
 
 HORIZON = 6
@@ -115,7 +110,7 @@ for i, house_id in enumerate(house_ids, start = 1):
 
 
     kwh_min, kwh_max = Helper_functions.extract_kwh(local_kwh_scaler_df, house_id)
-    train_df, val_df, test_df = Helper_functions.get_house_split(df, house_id, feature_cols)
+    train_df, val_df, _ = Helper_functions.get_house_split(df, house_id, feature_cols)
 
     house_x_train, house_y_train = Helper_functions.make_xy(train_df, window_size=WINDOW_SIZE, target_col=TARGET_COL, horizon = HORIZON)
     house_x_val, house_y_val = Helper_functions.make_xy(val_df, window_size=WINDOW_SIZE, target_col=TARGET_COL, horizon = HORIZON)
@@ -131,7 +126,7 @@ for i, house_id in enumerate(house_ids, start = 1):
     #run inference on global model
     pred_scaled_federated = starting_model.predict(house_x_val, verbose=0) #run inference
 
-    #find metrics on test set (federated)
+    #find metrics on val set (federated)
     federated_metrics, _, _ = Helper_functions.evaluate_predictions_multistep(
         y_scaled=house_y_val,
         pred_scaled=pred_scaled_federated,
@@ -174,7 +169,7 @@ for i, house_id in enumerate(house_ids, start = 1):
 
 results_df = pd.DataFrame(results)
 
-results_df.to_csv("fine_tuned_CNN_LSTM_6step_per_house_validation_eval.csv", index=False)
+results_df.to_csv("fine_tuned_LSTM64_Dense_per_house_eval.csv", index=False)
 
 print("Mean RMSE across horizons federated:", results_df["federated_mean_rmse"].mean())
 print("Median RMSE across horizons federated:", results_df["federated_mean_rmse"].median())
@@ -204,7 +199,7 @@ print("Houses worsened in MAE:", (results_df["delta_mae"] < 0).sum())
 
 
 summary_df = pd.DataFrame([{
-    "model": "fine_tuned_CNN_LSTM_validation_6step",
+    "model": "fine_tuned_LSTM64_Dense",
     "checkpoint id": global_model_path,
     "Mean RMSE across horizons federated": results_df["federated_mean_rmse"].mean(),
     "Median RMSE across horizons federated": results_df["federated_mean_rmse"].median(),
@@ -230,5 +225,5 @@ summary_df = pd.DataFrame([{
     
 }])
 
-summary_df.to_csv("fine_tuned_CNN_LSTM_6step_validation_summary.csv", index=False)
+summary_df.to_csv("fine_tuned_LSTM64_Dense_summary.csv", index=False)
 print(summary_df)

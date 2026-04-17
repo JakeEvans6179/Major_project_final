@@ -22,7 +22,7 @@ Workflow:
    - fit SARIMA candidates on train
    - select best candidate using rolling recursive 6-step validation forecasts
      on a shortened validation search window
-   - refit best candidate on full train + full val
+   - refit best candidate on full train set
    - evaluate on validation using rolling recursive 6-step forecasts
 3. Save per-house results, candidate search results, summary CSV, and plots
 """

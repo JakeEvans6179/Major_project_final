@@ -24,17 +24,12 @@ Carry out fine tuning, calculate new metrics (RMSE, MAE on validation set)
 Compare to see if there is any improvement
 '''
 
-plots_dir = Path("train_val_curve")
-plots_dir.mkdir(exist_ok=True) # This creates the folder if it doesn't exist
 
+data_path = Path("../data_files/final_locked_100_normalised.parquet")
+max_min_path = Path("../data_files/global_weather_scaler.csv")
+local_kwh_scaling = Path("../data_files/local_kwh_scaler.csv")
 
-data_path = Path("selected_100_normalised_ph.parquet")
-
-max_min_path = Path("global_weather_scaler.csv")
-
-local_kwh_scaling = Path("local_kwh_scaler.csv")
-
-global_model_path = "chunk_checkpoints/global_chunk_031_CNN_LSTM.keras"  #find the best model from validation screening and use for fine tuning
+global_model_path = Path("chunk_checkpoints/global_chunk_038_CNN_LSTM.keras")  #find the best model from validation screening and use for fine tuning
 
 
 HORIZON = 6
@@ -131,7 +126,7 @@ for i, house_id in enumerate(house_ids, start = 1):
     #run inference on global model
     pred_scaled_federated = starting_model.predict(house_x_val, verbose=0) #run inference
 
-    #find metrics on test set (federated)
+    #find metrics on val set (federated)
     federated_metrics, _, _ = Helper_functions.evaluate_predictions_multistep(
         y_scaled=house_y_val,
         pred_scaled=pred_scaled_federated,
@@ -174,7 +169,7 @@ for i, house_id in enumerate(house_ids, start = 1):
 
 results_df = pd.DataFrame(results)
 
-results_df.to_csv("fine_tuned_CNN_LSTM_6step_per_house_validation_eval.csv", index=False)
+results_df.to_csv("fine_tuned_CNN_LSTM_per_house.csv", index=False)
 
 print("Mean RMSE across horizons federated:", results_df["federated_mean_rmse"].mean())
 print("Median RMSE across horizons federated:", results_df["federated_mean_rmse"].median())
@@ -204,7 +199,7 @@ print("Houses worsened in MAE:", (results_df["delta_mae"] < 0).sum())
 
 
 summary_df = pd.DataFrame([{
-    "model": "fine_tuned_CNN_LSTM_validation_6step",
+    "model": "fine_tuned_CNN_LSTM",
     "checkpoint id": global_model_path,
     "Mean RMSE across horizons federated": results_df["federated_mean_rmse"].mean(),
     "Median RMSE across horizons federated": results_df["federated_mean_rmse"].median(),
@@ -230,5 +225,5 @@ summary_df = pd.DataFrame([{
     
 }])
 
-summary_df.to_csv("fine_tuned_CNN_LSTM_6step_validation_summary.csv", index=False)
+summary_df.to_csv("fine_tuned_CNN_LSTM_summary.csv", index=False)
 print(summary_df)
