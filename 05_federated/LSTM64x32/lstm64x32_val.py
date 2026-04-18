@@ -52,15 +52,6 @@ feature_cols = [
 
 
 
-
-
-
-
-
-
-
-
-
 df, local_kwh_scaler_df, global_temp_min, global_temp_max, global_hum_min, global_hum_max = Helper_functions.load_data(data_path, max_min_path, local_kwh_scaling)   #load global weather scalers and local kwh scalers
 #house_ids = sorted(df["LCLid"].unique())[:15]
 house_ids = sorted(df["LCLid"].unique())

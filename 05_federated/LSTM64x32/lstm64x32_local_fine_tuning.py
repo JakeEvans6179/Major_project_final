@@ -15,7 +15,7 @@ import Helper_functions
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
 '''
-CNN_LSTM validation metrics (Federated fine tuning)
+LSTM64x32 validation metrics (Federated fine tuning)
 
 Load global model, calculate original metrics (RMSE, MAE on validation set)
 
@@ -29,7 +29,7 @@ data_path = Path("../data_files/final_locked_100_normalised.parquet")
 max_min_path = Path("../data_files/global_weather_scaler.csv")
 local_kwh_scaling = Path("../data_files/local_kwh_scaler.csv")
 
-global_model_path = Path("chunk_checkpoints/global_chunk_0xx_LSTM64x32.keras")  #find the best model from validation screening and use for fine tuning
+global_model_path = Path("chunk_checkpoints/global_chunk_034_LSTM64x32.keras")  #find the best model from validation screening and use for fine tuning
 
 
 HORIZON = 6
