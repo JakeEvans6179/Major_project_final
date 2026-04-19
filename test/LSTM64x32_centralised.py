@@ -62,6 +62,8 @@ for i, house_id in enumerate(house_ids, start = 1):
     _, _, test_df = Helper_functions.get_house_split(df, house_id, feature_cols)
 
     
+
+    
     house_x_test, house_y_test = Helper_functions.make_xy(test_df, window_size=WINDOW_SIZE, target_col=TARGET_COL, horizon = HORIZON)
     
 

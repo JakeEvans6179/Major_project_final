@@ -3,20 +3,19 @@ import gc
 import argparse
 from pathlib import Path
 
-'''
-FL for LSTM64x32 model, run in chunks
-'''
+"""
+Clustered FL for LSTM64x32 model, run in chunks
+"""
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import tensorflow as tf
 import flwr as fl
 
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, Conv1D
+from tensorflow.keras.layers import Input, LSTM, Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 
 from flwr.common import parameters_to_ndarrays, ndarrays_to_parameters
@@ -75,7 +74,7 @@ def enable_gpu_memory_growth():
 def build_model(input_shape):
     model = Sequential([
         Input(shape=input_shape),
-        LSTM(64, return_sequences = True),
+        LSTM(64, return_sequences=True),
         Dropout(0.2),
         LSTM(32),
         Dropout(0.2),
@@ -109,6 +108,32 @@ def weighted_average(metrics):
         aggregated[key] = weighted_sum / used_examples if used_examples > 0 else None
 
     return aggregated
+
+
+def load_cluster_house_ids(assignment_file, target_cluster):
+    assignment_path = Path(assignment_file)
+    if not assignment_path.exists():
+        raise FileNotFoundError(f"Assignment file not found: {assignment_file}")
+
+    assignments = pd.read_csv(assignment_path)
+
+    required_cols = {"house_id", "cluster"}
+    if not required_cols.issubset(assignments.columns):
+        raise ValueError(
+            f"Assignment file must contain columns {required_cols}, "
+            f"but got {assignments.columns.tolist()}"
+        )
+
+    cluster_house_ids = assignments.loc[
+        assignments["cluster"] == target_cluster, "house_id"
+    ].astype(str).tolist()
+
+    if len(cluster_house_ids) == 0:
+        raise ValueError(
+            f"No houses found for cluster {target_cluster} in {assignment_file}"
+        )
+
+    return cluster_house_ids
 
 
 # ==========================================
@@ -205,7 +230,7 @@ def load_manifest():
     if manifest_df.empty:
         raise RuntimeError("Manifest is empty after preprocessing.")
 
-    valid_house_ids = manifest_df["house_id"].tolist()
+    valid_house_ids = manifest_df["house_id"].astype(str).tolist()
 
     first_house = valid_house_ids[0]
     with np.load(CLIENT_DATA_DIR / f"{first_house}.npz") as data:
@@ -228,13 +253,6 @@ class HouseClient(fl.client.NumPyClient):
             x_train = data["x_train"]
             y_train = data["y_train"]
         return x_train, y_train
-
-    def _load_val_arrays(self):
-        path = CLIENT_DATA_DIR / f"{self.house_id}.npz"
-        with np.load(path) as data:
-            x_val = data["x_val"]
-            y_val = data["y_val"]
-        return x_val, y_val
 
     def get_parameters(self, config):
         return self.model.get_weights()
@@ -262,23 +280,8 @@ class HouseClient(fl.client.NumPyClient):
         return updated_weights, num_examples, {"train_loss": train_loss}
 
     def evaluate(self, parameters, config):
-        self.model.set_weights(parameters)
-
-        x_val, y_val = self._load_val_arrays()
-
-        loss, rmse = self.model.evaluate(
-            x_val,
-            y_val,
-            batch_size=min(BATCH_SIZE, len(x_val)),
-            verbose=0,
-        )
-
-        num_examples = int(len(x_val))
-
-        del x_val, y_val
-        gc.collect()
-
-        return float(loss), num_examples, {"rmse": float(rmse)}
+        # kept for interface completeness, but not used when fraction_evaluate=0.0
+        return 0.0, 0, {}
 
 
 def make_client_fn(valid_house_ids, dummy_input_shape):
@@ -302,8 +305,6 @@ class TrackingFedAvg(fl.server.strategy.FedAvg):
         self.house_id_lookup = house_id_lookup
         self.global_round_offset = global_round_offset
         self.fit_selection_log = []
-        self.eval_selection_log = []
-        self.round_eval_log = []
         self.final_parameters = None
 
     def _global_round(self, server_round: int) -> int:
@@ -327,27 +328,6 @@ class TrackingFedAvg(fl.server.strategy.FedAvg):
         print(f"[Global round {self._global_round(server_round)}] Fit clients: {selected}")
         return fit_cfg
 
-    def configure_evaluate(self, server_round, parameters, client_manager):
-        eval_cfg = super().configure_evaluate(server_round, parameters, client_manager)
-
-        if eval_cfg is None:
-            return None
-
-        selected = []
-        for client_proxy, _ in eval_cfg:
-            cid = client_proxy.cid
-            house_id = self.house_id_lookup[int(cid)]
-            selected.append(house_id)
-
-        self.eval_selection_log.append({
-            "chunk_round": server_round,
-            "global_round": self._global_round(server_round),
-            "n_eval_clients": len(selected),
-            "eval_house_ids": selected,
-        })
-        print(f"[Global round {self._global_round(server_round)}] Eval clients: {selected}")
-        return eval_cfg
-
     def aggregate_fit(self, server_round, results, failures):
         aggregated_parameters, aggregated_metrics = super().aggregate_fit(
             server_round, results, failures
@@ -356,38 +336,21 @@ class TrackingFedAvg(fl.server.strategy.FedAvg):
             self.final_parameters = aggregated_parameters
         return aggregated_parameters, aggregated_metrics
 
-    def aggregate_evaluate(self, server_round, results, failures):
-        aggregated_loss, aggregated_metrics = super().aggregate_evaluate(
-            server_round, results, failures
-        )
-
-        self.round_eval_log.append({
-            "chunk_round": server_round,
-            "global_round": self._global_round(server_round),
-            "aggregated_val_loss": aggregated_loss,
-            "aggregated_val_rmse": (
-                aggregated_metrics.get("rmse") if aggregated_metrics else None
-            ),
-        })
-
-        print(
-            f"[Global round {self._global_round(server_round)}] "
-            f"Aggregated val loss: {aggregated_loss}"
-        )
-        return aggregated_loss, aggregated_metrics
-
 
 # ==========================================
 # MAIN
 # ==========================================
 def main():
     print("ENTERED fl_chunk_run main()", flush=True)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--chunk-rounds", type=int, required=True)
     parser.add_argument("--fraction-fit", type=float, required=True)
     parser.add_argument("--fraction-evaluate", type=float, required=True)
     parser.add_argument("--chunk-index", type=int, required=True)
     parser.add_argument("--start-round", type=int, required=True)
+    parser.add_argument("--assignment-file", type=str, required=True)
+    parser.add_argument("--target-cluster", type=int, required=True)
     parser.add_argument("--in-model", type=str, default="")
     parser.add_argument("--out-model", type=str, required=True)
     parser.add_argument("--out-dir", type=str, required=True)
@@ -399,7 +362,21 @@ def main():
 
     ensure_precomputed()
     valid_house_ids, dummy_input_shape = load_manifest()
+
+    cluster_house_ids = set(
+        load_cluster_house_ids(args.assignment_file, args.target_cluster)
+    )
+
+    valid_house_ids = [h for h in valid_house_ids if h in cluster_house_ids]
+
+    if len(valid_house_ids) == 0:
+        raise RuntimeError(
+            f"No manifest houses matched cluster {args.target_cluster} from {args.assignment_file}"
+        )
+
     num_clients = len(valid_house_ids)
+    print(f"Cluster {args.target_cluster}: {num_clients} houses")
+
     client_fn = make_client_fn(valid_house_ids, dummy_input_shape)
 
     initial_parameters = None
@@ -416,19 +393,16 @@ def main():
         fraction_fit=args.fraction_fit,
         fraction_evaluate=args.fraction_evaluate,
         min_fit_clients=max(1, int(np.ceil(num_clients * args.fraction_fit))),
-        min_evaluate_clients=(
-            0 if args.fraction_evaluate == 0.0
-            else max(1, int(np.ceil(num_clients * args.fraction_evaluate)))
-        ),
+        min_evaluate_clients=0,
         min_available_clients=num_clients,
         fit_metrics_aggregation_fn=weighted_average,
-        evaluate_metrics_aggregation_fn=weighted_average,
         initial_parameters=initial_parameters,
         accept_failures=False,
     )
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
     print("STARTING FLOWER SIMULATION", flush=True)
     fl.simulation.start_simulation(
         client_fn=client_fn,
@@ -446,12 +420,7 @@ def main():
     )
 
     fit_log_df = pd.DataFrame(strategy.fit_selection_log)
-    eval_log_df = pd.DataFrame(strategy.eval_selection_log)
-    round_eval_df = pd.DataFrame(strategy.round_eval_log)
-
     fit_log_df.to_csv(out_dir / "fit_selection.csv", index=False)
-    eval_log_df.to_csv(out_dir / "eval_selection.csv", index=False)
-    round_eval_df.to_csv(out_dir / "round_validation.csv", index=False)
 
     if strategy.final_parameters is None:
         raise RuntimeError("No final aggregated parameters were captured.")
@@ -460,23 +429,6 @@ def main():
     final_model = build_model(dummy_input_shape)
     final_model.set_weights(final_weights)
     final_model.save(args.out_model)
-
-    if not round_eval_df.empty and "aggregated_val_loss" in round_eval_df.columns:
-        plt.figure(figsize=(10, 6))
-        plt.plot(
-            round_eval_df["global_round"],
-            round_eval_df["aggregated_val_loss"],
-            marker="o",
-            label="Aggregated validation loss",
-        )
-        plt.xlabel("Global round")
-        plt.ylabel("Validation loss (MSE)")
-        plt.title("Chunk validation loss")
-        plt.grid(True, alpha=0.3)
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(out_dir / "validation_loss.png", dpi=200)
-        plt.close()
 
 
 if __name__ == "__main__":
