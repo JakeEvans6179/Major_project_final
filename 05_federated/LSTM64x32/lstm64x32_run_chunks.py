@@ -7,7 +7,7 @@ FRACTION_FIT = 0.3
 FRACTION_EVALUATE = 0.0
 
 START_CHUNK = 40
-FINAL_CHUNK = 100   
+FINAL_CHUNK = 80   
 
 CHECKPOINT_DIR = Path("chunk_checkpoints")
 LOG_ROOT = Path("chunk_logs_extended")
