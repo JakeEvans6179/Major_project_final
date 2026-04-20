@@ -2,21 +2,25 @@ import subprocess
 import sys
 from pathlib import Path
 
-# ===== first test settings =====
-TOTAL_CHUNKS = 40
 CHUNK_ROUNDS = 5
 FRACTION_FIT = 0.3
-FRACTION_EVALUATE = 0.0   # safer first test
+FRACTION_EVALUATE = 0.0
+
+START_CHUNK = 40
+FINAL_CHUNK = 100   
 
 CHECKPOINT_DIR = Path("chunk_checkpoints")
-LOG_ROOT = Path("chunk_logs")
+LOG_ROOT = Path("chunk_logs_extended")
 CHECKPOINT_DIR.mkdir(exist_ok=True)
 LOG_ROOT.mkdir(exist_ok=True)
 
-current_model = ""
-start_round = 0
+current_model = CHECKPOINT_DIR / f"global_chunk_{START_CHUNK:03d}_LSTM64x32.keras"
+start_round = START_CHUNK * CHUNK_ROUNDS   # 40 * 5 = 200
 
-for chunk_idx in range(1, TOTAL_CHUNKS + 1):
+if not current_model.exists():
+    raise FileNotFoundError(f"Starting checkpoint not found: {current_model}")
+
+for chunk_idx in range(START_CHUNK + 1, FINAL_CHUNK + 1):
     out_model = CHECKPOINT_DIR / f"global_chunk_{chunk_idx:03d}_LSTM64x32.keras"
     out_dir = LOG_ROOT / f"chunk_{chunk_idx:03d}"
 
@@ -30,17 +34,15 @@ for chunk_idx in range(1, TOTAL_CHUNKS + 1):
         "--start-round", str(start_round),
         "--out-model", str(out_model),
         "--out-dir", str(out_dir),
+        "--in-model", str(current_model),
     ]
 
-    if current_model:
-        cmd += ["--in-model", current_model]
-
-    print(f"\n=== Running chunk {chunk_idx}/{TOTAL_CHUNKS} ===")
+    print(f"\n=== Running chunk {chunk_idx}/{FINAL_CHUNK} ===")
     print(" ".join(cmd))
 
     subprocess.run(cmd, check=True)
 
-    current_model = str(out_model)
+    current_model = out_model
     start_round += CHUNK_ROUNDS
 
 print("\nAll chunks completed.")
