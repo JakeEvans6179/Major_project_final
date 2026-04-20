@@ -306,6 +306,7 @@ class TrackingFedAvg(fl.server.strategy.FedAvg):
         self.global_round_offset = global_round_offset
         self.fit_selection_log = []
         self.final_parameters = None
+        self.round_fit_log = [] #NEW
 
     def _global_round(self, server_round: int) -> int:
         return self.global_round_offset + server_round
@@ -331,9 +332,31 @@ class TrackingFedAvg(fl.server.strategy.FedAvg):
     def aggregate_fit(self, server_round, results, failures):
         aggregated_parameters, aggregated_metrics = super().aggregate_fit(
             server_round, results, failures
+    )
+
+        self.round_fit_log.append({
+            "chunk_round": server_round,
+            "global_round": self._global_round(server_round),
+            "n_results": len(results),
+            "n_failures": len(failures),
+            "aggregated_train_loss": (
+                aggregated_metrics.get("train_loss") if aggregated_metrics else None
+            ),
+        })
+
+        print(
+            f"[Global round {self._global_round(server_round)}] "
+            f"fit results={len(results)}, failures={len(failures)}"
         )
+
+        if len(failures) > 0:
+            raise RuntimeError(
+                f"Round {self._global_round(server_round)} had {len(failures)} client failures."
+            )
+
         if aggregated_parameters is not None:
             self.final_parameters = aggregated_parameters
+
         return aggregated_parameters, aggregated_metrics
 
 
@@ -421,6 +444,9 @@ def main():
 
     fit_log_df = pd.DataFrame(strategy.fit_selection_log)
     fit_log_df.to_csv(out_dir / "fit_selection.csv", index=False)
+
+    round_fit_df = pd.DataFrame(strategy.round_fit_log)
+    round_fit_df.to_csv(out_dir / "round_fit_summary.csv", index=False)
 
     if strategy.final_parameters is None:
         raise RuntimeError("No final aggregated parameters were captured.")
