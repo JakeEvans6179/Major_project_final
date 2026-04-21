@@ -25,13 +25,14 @@ DATA_PATH = Path("../data_files/final_locked_100_normalised.parquet")
 MAX_MIN_PATH = Path("../data_files/global_weather_scaler.csv")
 LOCAL_KWH_SCALING = Path("../data_files/local_kwh_scaler.csv")
 
-ASSIGNMENT_FILE = Path("kmeans_assignments_rowz_k3.csv")
+ASSIGNMENT_FILE = Path("kmeans_assignments_rowz_k4.csv")
 
 # cluster checkpoint folders from your clustered training runs
 CLUSTER_CHECKPOINT_DIRS = {
     0: Path("chunk_checkpoints_cluster_0"),
     1: Path("chunk_checkpoints_cluster_1"),
     2: Path("chunk_checkpoints_cluster_2"),
+    3: Path("chunk_checkpoints_cluster_3"),
 }
 
 NUM_CHUNKS = 40

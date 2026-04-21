@@ -135,7 +135,9 @@ for k in K_VALUES:
     kmeans = KMeans(
         n_clusters=k,
         random_state=42,
-        n_init=1000
+        n_init=1000,
+        max_iter=1000,
+        tol=1e-6,
     )
 
     labels = kmeans.fit_predict(X)

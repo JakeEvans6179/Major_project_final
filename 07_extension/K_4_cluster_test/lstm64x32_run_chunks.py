@@ -22,7 +22,8 @@ FRACTION_FIT = 0.3
 FRACTION_EVALUATE = 0.0
 
 assignments_df = pd.read_csv(ASSIGNMENT_FILE)
-cluster_ids = sorted(assignments_df["cluster"].unique())
+#cluster_ids = sorted(assignments_df["cluster"].unique())
+cluster_ids = [2,3] #finish clusters 2 and 3 
 
 for target_cluster in cluster_ids:
     print(f"\n==============================")

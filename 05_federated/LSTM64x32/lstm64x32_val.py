@@ -37,7 +37,7 @@ HORIZON = 6
 WINDOW_SIZE = 24
 TARGET_COL = "kwh"
 
-num_chunks = 40
+num_chunks = 100
 
 
 #model input features
