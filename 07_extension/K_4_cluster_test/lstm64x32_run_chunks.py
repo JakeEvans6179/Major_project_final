@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 
-ASSIGNMENT_FILE = Path("kmeans_assignments_rowz_k4.csv")
+ASSIGNMENT_FILE = Path("kmeans_assignments_rowu_k4.csv")
 
 TOTAL_CHUNKS = 40
 CHUNK_ROUNDS = 5

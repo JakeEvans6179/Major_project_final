@@ -29,7 +29,7 @@ original_house_ids = (
     .tolist()
 )
 
-# --- 4. FINAL ORIGINAL REJECT LIST (13) ---
+#Rejects from the original 100 sample (from stage 1 QA)
 original_reject_ids = [
     "MAC000020",
     "MAC000023",

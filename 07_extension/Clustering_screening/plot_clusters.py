@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 '''
-Plot the 24 hour average profiles of all households within each cluster, for k=2 and k=3.
+Plot the 24 hour average profiles of all households within each cluster, for k=2, k=3, k=4
 '''
 
 # Load raw 24D profiles
@@ -10,7 +10,7 @@ hourly_profiles = pd.read_csv("household_24h_train_profiles_raw.csv")
 features = [f"h{i:02d}" for i in range(24)]
 
 for k in [2, 3, 4]:
-    assignments = pd.read_csv(f"kmeans_assignments_rowz_k{k}.csv")
+    assignments = pd.read_csv(f"kmeans_assignments_rowu_k{k}.csv")
     df_merged = hourly_profiles.merge(assignments, on="house_id")
 
     cluster_ids = sorted(df_merged["cluster"].unique())
