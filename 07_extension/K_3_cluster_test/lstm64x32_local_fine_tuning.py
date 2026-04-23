@@ -30,17 +30,17 @@ DATA_PATH = Path("../data_files/final_locked_100_normalised.parquet")
 MAX_MIN_PATH = Path("../data_files/global_weather_scaler.csv")
 LOCAL_KWH_SCALING = Path("../data_files/local_kwh_scaler.csv")
 
-ASSIGNMENT_FILE = Path("kmeans_assignments_rowz_k3.csv")
+ASSIGNMENT_FILE = Path("kmeans_assignments_rowu_k3.csv")
 
 # ---- choose ONE checkpoint per cluster ----
 # Option A: same best overall chunk index for both clusters
 CLUSTER_MODEL_PATHS = {
-    0: Path("chunk_checkpoints_cluster_0/chunk_038_LSTM64x32_cluster_0.keras"),
-    1: Path("chunk_checkpoints_cluster_1/chunk_038_LSTM64x32_cluster_1.keras"),
-    2: Path("chunk_checkpoints_cluster_2/chunk_038_LSTM64x32_cluster_2.keras"),
+    0: Path("chunk_checkpoints_cluster_0/chunk_037_LSTM64x32_cluster_0.keras"),
+    1: Path("chunk_checkpoints_cluster_1/chunk_037_LSTM64x32_cluster_1.keras"),
+    2: Path("chunk_checkpoints_cluster_2/chunk_037_LSTM64x32_cluster_2.keras"),
 }
 
-# If later you want best-per-cluster instead, just change the paths above.
+
 
 # =========================================================
 # SETTINGS
