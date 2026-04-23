@@ -29,6 +29,9 @@ global_model_path = Path("chunk_checkpoints/global_chunk_094_LSTM64x32.keras")  
 models_dir = Path("final_models")
 models_dir.mkdir(exist_ok=True) # This creates the folder if it doesn't exist
 
+plots_dir = Path("final_plots")
+plots_dir.mkdir(exist_ok=True) # This creates the folder if it doesn't exist
+
 
 HORIZON = 6
 WINDOW_SIZE = 24
@@ -142,7 +145,7 @@ for i, house_id in enumerate(house_ids, start = 1):
 
     pred_scaled_fine_tuned = fine_tuned_model.predict(house_x_test, verbose = 0)
 
-    fine_tuned_metrics, _, _ = Helper_functions.evaluate_predictions_multistep(
+    fine_tuned_metrics, y_raw, pred_raw = Helper_functions.evaluate_predictions_multistep(
         y_scaled = house_y_test,
         pred_scaled = pred_scaled_fine_tuned,
         min_val = kwh_min,
@@ -164,6 +167,53 @@ for i, house_id in enumerate(house_ids, start = 1):
         "epochs_run": len(history.history["loss"]),
         "best_epoch": int(np.argmin(history.history["val_loss"]) + 1)
     })
+
+    plot_horizon = min(14 * 24, len(y_raw))
+
+    # ==========================================
+    # PLOT 1: Forecast for 1 Hour Ahead (t+1)
+    # Using column index 0: y_raw[:, 0]
+    # ==========================================
+    plt.figure(figsize=(12, 4))
+    plt.plot(y_raw[:plot_horizon, 0], label="Actual t+1")
+    plt.plot(pred_raw[:plot_horizon, 0], label="Predicted t+1")
+    plt.xlabel("Test sample index")
+    plt.ylabel("kWh")
+    plt.title(f"{house_id} | 6-step forecast | LSTM64x32 | Horizon t+1")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(plots_dir/f"{house_id}_tplus1.png", dpi=200)
+    plt.close()
+
+    # ==========================================
+    # PLOT 2: Forecast for 3 Hours Ahead (t+3)
+    # Using column index 2: y_raw[:, 2]
+    # ==========================================
+    plt.figure(figsize=(12, 4))
+    plt.plot(y_raw[:plot_horizon, 2], label="Actual t+3")
+    plt.plot(pred_raw[:plot_horizon, 2], label="Predicted t+3")
+    plt.xlabel("Test sample index")
+    plt.ylabel("kWh")
+    plt.title(f"{house_id} | 6-step forecast | LSTM64x32 | Horizon t+3")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(plots_dir/f"{house_id}_tplus3.png", dpi=200)
+    plt.close()
+
+    # ==========================================
+    # PLOT 3: Forecast for 6 Hours Ahead (t+6)
+    # Using column index 5: y_raw[:, 5]
+    # ==========================================
+    plt.figure(figsize=(12, 4))
+    plt.plot(y_raw[:plot_horizon, 5], label="Actual t+6")
+    plt.plot(pred_raw[:plot_horizon, 5], label="Predicted t+6")
+    plt.xlabel("Test sample index")
+    plt.ylabel("kWh")
+    plt.title(f"{house_id} | 6-step forecast | LSTM64x32 | Horizon t+6")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(plots_dir/f"{house_id}_tplus6.png", dpi=200)
+    plt.close()
 
     #save model
     save_model(fine_tuned_model, models_dir/f"fine_tuned_LSTM64x32_{house_id}.keras")
