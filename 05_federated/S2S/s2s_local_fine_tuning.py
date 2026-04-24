@@ -29,7 +29,7 @@ data_path = Path("../data_files/final_locked_100_normalised.parquet")
 max_min_path = Path("../data_files/global_weather_scaler.csv")
 local_kwh_scaling = Path("../data_files/local_kwh_scaler.csv")
 
-global_model_path = Path("chunk_checkpoints/global_chunk_038_S2S.keras")  #find the best model from validation screening and use for fine tuning
+global_model_path = Path("chunk_checkpoints/global_chunk_034_S2S.keras")  #find the best model from validation screening and use for fine tuning
 
 
 HORIZON = 6
