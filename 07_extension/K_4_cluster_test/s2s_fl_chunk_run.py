@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 """
-Clustered FL for LSTM64x32 model, run in chunks
+Clustered FL for S2S model, run in chunks
 """
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
@@ -15,7 +15,7 @@ import tensorflow as tf
 import flwr as fl
 
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Input, LSTM, Dense, Dropout
+from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, RepeatVector, TimeDistributed, Flatten
 from tensorflow.keras.optimizers import Adam
 
 from flwr.common import parameters_to_ndarrays, ndarrays_to_parameters
@@ -73,12 +73,27 @@ def enable_gpu_memory_growth():
 
 def build_model(input_shape):
     model = Sequential([
-        Input(shape=input_shape),
-        LSTM(64, return_sequences=True),
-        Dropout(0.2),
-        LSTM(32),
-        Dropout(0.2),
-        Dense(HORIZON, activation="linear")
+        Input(shape=input_shape), # (batch, 24, 10)
+
+        # Encoder
+        LSTM(50, return_sequences=False, name="encoder_lstm"),  #outputs summary vector (50 dimensional) --> (batch, 50)
+
+        # Latent bottleneck
+        Dense(12, activation="tanh", name="latent_dense"), #compress into a smaller bottlneck representation (12 dimensional) --> (batch, 12)
+
+        # Repeat latent vector across forecast horizon
+        RepeatVector(HORIZON, name="repeat_vector"),    #convert back into repeated sequence (batch, 6, 12)
+
+        # Decoder
+        LSTM(50, return_sequences=True, name="decoder_lstm"),   #decode back into sequence (batch, 6, 50), each timestep has 50 dimensional representation
+
+        # Output head
+        TimeDistributed(Dense(100, activation="relu"), name="td_dense_100"),    #(batch, 6, 50) -> (batch, 6, 100), applies same dense layer to each of the 6 decoder outputs
+        #Dropout(0.2, name="td_dropout"), #regularise with dropout
+        TimeDistributed(Dense(1, activation="linear"), name="td_dense_1"), #final output layer (batch, 6, 100) -> (batch, 6, 1)
+
+        # (batch, 6, 1) -> (batch, 6)
+        Flatten(name="flatten_horizon") #for helper functions
     ])
     model.compile(
         optimizer=Adam(learning_rate=LEARNING_RATE),

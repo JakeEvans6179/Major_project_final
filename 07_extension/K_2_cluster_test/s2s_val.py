@@ -10,7 +10,7 @@ import Helper_functions
 print("Num GPUs Available: ", len(tf.config.list_physical_devices("GPU")))
 
 """
-LSTM64x32 clustered federated training - validation screening
+s2s clustered federated training - validation screening
 
 For each communication chunk:
 - load one checkpoint per cluster
@@ -131,7 +131,7 @@ for chunk_idx in range(1, NUM_CHUNKS + 1):
     for cluster_id in clusters_in_assignments:
         model_path = (
             CLUSTER_CHECKPOINT_DIRS[cluster_id]
-            / f"chunk_{chunk_idx:03d}_LSTM64x32_cluster_{cluster_id}.keras"
+            / f"chunk_{chunk_idx:03d}_S2S_cluster_{cluster_id}.keras"
         )
 
         if not model_path.exists():
@@ -195,7 +195,7 @@ for chunk_idx in range(1, NUM_CHUNKS + 1):
 # SAVE RESULTS
 # =========================
 summary_df = pd.DataFrame(chunk_cluster_metrics)
-summary_df["model"] = "LSTM64x32_clustered_federated"
+summary_df["model"] = "S2S_clustered_federated"
 summary_df.to_csv("chunk_validation_results_clustered.csv", index=False)
 
 best_chunk = int(summary_df.loc[summary_df["overall_mean_rmse_kwh"].idxmin(), "chunk"])

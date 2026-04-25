@@ -4,7 +4,7 @@ from pathlib import Path
 
 '''
 
-Master script for running LSTM 64x32 FL training in chunks on specified cluster. 
+Master script for running S2S FL training in chunks on specified cluster. 
 Change assignment file and target cluster variables depending on which cluster is being run on
 
 '''
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 
-ASSIGNMENT_FILE = Path("kmeans_assignments_rowu_k3.csv")
+ASSIGNMENT_FILE = Path("kmeans_assignments_rowu_k4.csv")
 
 TOTAL_CHUNKS = 40
 CHUNK_ROUNDS = 5
@@ -23,6 +23,7 @@ FRACTION_EVALUATE = 0.0
 
 assignments_df = pd.read_csv(ASSIGNMENT_FILE)
 cluster_ids = sorted(assignments_df["cluster"].unique())
+
 
 for target_cluster in cluster_ids:
     print(f"\n==============================")
@@ -38,12 +39,12 @@ for target_cluster in cluster_ids:
     start_round = 0
 
     for chunk_idx in range(1, TOTAL_CHUNKS + 1):
-        out_model = CHECKPOINT_DIR / f"chunk_{chunk_idx:03d}_LSTM64x32_cluster_{target_cluster}.keras"
+        out_model = CHECKPOINT_DIR / f"chunk_{chunk_idx:03d}_S2S_cluster_{target_cluster}.keras"
         out_dir = LOG_ROOT / f"chunk_{chunk_idx:03d}"
 
         cmd = [
             sys.executable,
-            "lstm64x32_fl_chunk_run.py",
+            "s2s_fl_chunk_run.py",
             "--chunk-rounds", str(CHUNK_ROUNDS),
             "--fraction-fit", str(FRACTION_FIT),
             "--fraction-evaluate", str(FRACTION_EVALUATE),
