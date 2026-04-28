@@ -12,9 +12,10 @@ Remove duplicate readings, calculate total duration of each house and compute co
 
 Colect all eligible houses for plotting
 '''
-# Define the path for your saved Parquet file
 parquet_file = Path("saved_householddata.parquet")
 WINDOW_DURATION = 789       #01-01-2012 --> 28-02-2014
+
+
 # IF STATEMENT: Check if the file already exists
 if parquet_file.exists():
     print(f"Found {parquet_file.name} Loading data directly")
