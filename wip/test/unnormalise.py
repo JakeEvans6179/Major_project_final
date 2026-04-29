@@ -10,7 +10,7 @@ from tensorflow.keras.optimizers import Adam
 
 
 import random
-import Helper_functions
+import wip.test.Helper_functions as Helper_functions
 
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
