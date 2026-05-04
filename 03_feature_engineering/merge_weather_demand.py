@@ -3,13 +3,11 @@ import numpy as np
 import pandas as pd
 
 """
-**step 3**
+**step 2**
 Preprocess the 100 selected households:
 
 - load fixed-window raw rows
-- reindex each house to the expected 30-minute timeline
 - forward fill missing kwh
-- backfill only if the first value is missing
 - shift timestamps back 30 mins
 - aggregate to hourly kwh
 - add time features
@@ -21,11 +19,12 @@ Load in the processed weather data and merge into dataset in this script
 Normalise in next script
 """
 
-# --------------------------------------------------
-# CONFIG
-# --------------------------------------------------
+#weather and demand data path
 raw_parquet = Path("../02_household_selection/final_locked_100.parquet")
 out_parquet = Path("household_weather_merged.parquet")
+
+weather_parquet = Path("weather_data.parquet")
+
 
 WINDOW_DURATION = 789
 
@@ -34,7 +33,7 @@ common_start = common_end - pd.Timedelta(days=WINDOW_DURATION)
 
 print("common start:", common_start)
 
-# exact half-hour schedule expected for every house
+#exact half-hour schedule expected for every house
 expected_index_30m = pd.date_range(
     start=common_start + pd.Timedelta(minutes=30),      #start at the first half hour after starting, removes the first half hour reading
     end=common_end,
@@ -43,10 +42,9 @@ expected_index_30m = pd.date_range(
 
 print("Expected 30-min points per house:", len(expected_index_30m))
 
-# --------------------------------------------------
-# LOAD
-# --------------------------------------------------
+#load demand and weather data
 df = pd.read_parquet(raw_parquet)
+weather_df = pd.read_parquet(weather_parquet)
 
 df["DateTime"] = pd.to_datetime(df["DateTime"], errors="coerce")
 df["kwh"] = pd.to_numeric(df["kwh"], errors="coerce")
@@ -57,13 +55,11 @@ print(df.head())
 print("Unique houses:", df["LCLid"].nunique())
 print("Raw shape:", df.shape)
 
-# --------------------------------------------------
-# HOUSE PREPROCESS FUNCTION
-# --------------------------------------------------
+#house preprocess function (hourly aggregation, time features, missing value handling)
 def preprocess_one_house(house_df, house_id):
     house = house_df.copy()
 
-    # set index to time
+    #set index to time
     house = house.set_index("DateTime").sort_index()    #set index to DateTime
 
     #keep only kwh column during reindex
@@ -118,9 +114,7 @@ def preprocess_one_house(house_df, house_id):
     return hourly
 
 
-# --------------------------------------------------
-# RUN FOR ALL HOUSES
-# --------------------------------------------------
+#process each household and combine into one dataframe
 processed = []
 
 house_ids = sorted(df["LCLid"].unique())
@@ -150,8 +144,6 @@ print(hourly_df.isna().sum())
 Merge dataset with weather data, one copy for each houseid
 '''
 
-weather_parquet = Path("weather_data.parquet")
-weather_df = pd.read_parquet(weather_parquet)
 
 weather_df["DateTime"] = pd.to_datetime(weather_df["DateTime"], errors="coerce")
 

@@ -113,9 +113,7 @@ for i, house_id in enumerate(house_ids, start=1):
         print(f"Skipping {house_id}: insufficient samples after windowing")
         continue
 
-    # --------------------------------------------------
-    # Raw federated model evaluated on TEST
-    # --------------------------------------------------
+    #raw federated model evaluation on TEST before fine-tuning
     pred_scaled_federated = starting_model.predict(house_x_test, verbose=0)
 
     federated_metrics, y_test_raw, pred_fed_raw = Helper_functions.evaluate_predictions_multistep(
@@ -125,23 +123,15 @@ for i, house_id in enumerate(house_ids, start=1):
         max_val=kwh_max
     )
 
-    # House-level raw target std on TEST for optional normalized reporting
-    house_test_std = float(np.std(y_test_raw.reshape(-1)))
-    if house_test_std == 0:
-        house_test_std = np.nan
 
-    # --------------------------------------------------
-    # Fine-tune on TRAIN, early stop on VAL
-    # --------------------------------------------------
+    #fine-tuning on TRAIN with early stopping on VAL
     fine_tuned_model, history = train_model(
         house_x_train, house_y_train,
         house_x_val, house_y_val,
         starting_model
     )
 
-    # --------------------------------------------------
-    # Fine-tuned model evaluated on TEST
-    # --------------------------------------------------
+    #fine-tuned model evaluation on TEST
     pred_scaled_fine_tuned = fine_tuned_model.predict(house_x_test, verbose=0)
 
     fine_tuned_metrics, _, pred_ft_raw = Helper_functions.evaluate_predictions_multistep(
@@ -158,21 +148,6 @@ for i, house_id in enumerate(house_ids, start=1):
     delta_mae = (
         federated_metrics["mean_mae_across_horizons"]
         - fine_tuned_metrics["mean_mae_across_horizons"]
-    )
-
-    # Optional normalized RMSE using test-set std
-    federated_nrmse_std = (
-        federated_metrics["mean_rmse_across_horizons"] / house_test_std
-        if not np.isnan(house_test_std) else np.nan
-    )
-    fine_tuned_nrmse_std = (
-        fine_tuned_metrics["mean_rmse_across_horizons"] / house_test_std
-        if not np.isnan(house_test_std) else np.nan
-    )
-    delta_nrmse_std = (
-        federated_nrmse_std - fine_tuned_nrmse_std
-        if not np.isnan(federated_nrmse_std) and not np.isnan(fine_tuned_nrmse_std)
-        else np.nan
     )
 
     results.append({
@@ -211,11 +186,6 @@ for i, house_id in enumerate(house_ids, start=1):
         "delta_rmse": delta_rmse,
         "delta_mae": delta_mae,
 
-        "test_std_kwh": house_test_std,
-        "federated_nrmse_std": federated_nrmse_std,
-        "fine_tuned_nrmse_std": fine_tuned_nrmse_std,
-        "delta_nrmse_std": delta_nrmse_std,
-
         "epochs_run": len(history.history["loss"]),
         "best_epoch": int(np.argmin(history.history["val_loss"]) + 1),
         "n_train_windows": len(house_x_train),
@@ -248,18 +218,11 @@ print("Median delta RMSE across horizons:", results_df["delta_rmse"].median())
 print("Mean delta MAE across horizons:", results_df["delta_mae"].mean())
 print("Median delta MAE across horizons:", results_df["delta_mae"].median())
 
-print("Mean federated NRMSE_std:", results_df["federated_nrmse_std"].mean())
-print("Mean fine-tuned NRMSE_std:", results_df["fine_tuned_nrmse_std"].mean())
-print("Mean delta NRMSE_std:", results_df["delta_nrmse_std"].mean())
-
 print("Houses improved in RMSE:", (results_df["delta_rmse"] > 0).sum())
 print("Houses worsened in RMSE:", (results_df["delta_rmse"] < 0).sum())
 
 print("Houses improved in MAE:", (results_df["delta_mae"] > 0).sum())
 print("Houses worsened in MAE:", (results_df["delta_mae"] < 0).sum())
-
-print("Houses improved in NRMSE_std:", (results_df["delta_nrmse_std"] > 0).sum())
-print("Houses worsened in NRMSE_std:", (results_df["delta_nrmse_std"] < 0).sum())
 
 summary_df = pd.DataFrame([{
     "model": "FLFT_unseen_2week_LSTM64x32",
@@ -279,10 +242,6 @@ summary_df = pd.DataFrame([{
     "median_delta_rmse": results_df["delta_rmse"].median(),
     "mean_delta_mae": results_df["delta_mae"].mean(),
     "median_delta_mae": results_df["delta_mae"].median(),
-
-    "mean_federated_nrmse_std": results_df["federated_nrmse_std"].mean(),
-    "mean_fine_tuned_nrmse_std": results_df["fine_tuned_nrmse_std"].mean(),
-    "mean_delta_nrmse_std": results_df["delta_nrmse_std"].mean(),
 
     "mean_epochs_run": results_df["epochs_run"].mean(),
     "median_best_epoch": results_df["best_epoch"].median(),

@@ -23,27 +23,20 @@ For each house:
 - evaluate again on validation
 """
 
-# =========================================================
-# PATHS
-# =========================================================
+#paths
 DATA_PATH = Path("../data_files/final_locked_100_normalised.parquet")
 MAX_MIN_PATH = Path("../data_files/global_weather_scaler.csv")
 LOCAL_KWH_SCALING = Path("../data_files/local_kwh_scaler.csv")
 
 ASSIGNMENT_FILE = Path("kmeans_assignments_rowu_k2.csv")
 
-# ---- choose ONE checkpoint per cluster ----
-# Option A: same best overall chunk index for both clusters
+#choose best checkpoint for all clusters
 CLUSTER_MODEL_PATHS = {
     0: Path("chunk_checkpoints_cluster_0/chunk_040_LSTM64x32_cluster_0.keras"),
     1: Path("chunk_checkpoints_cluster_1/chunk_040_LSTM64x32_cluster_1.keras"),
 }
 
-# If later you want best-per-cluster instead, just change the paths above.
-
-# =========================================================
-# SETTINGS
-# =========================================================
+#settings
 HORIZON = 6
 WINDOW_SIZE = 24
 TARGET_COL = "kwh"
@@ -61,9 +54,7 @@ FT_EPOCHS = 100
 FT_PATIENCE = 10
 BATCH_SIZE = 256
 
-# =========================================================
-# HELPERS
-# =========================================================
+#helper functions
 def compile_for_finetuning(model):
     model.compile(
         optimizer=Adam(learning_rate=FT_LR),
@@ -94,18 +85,14 @@ def train_model(X_train, y_train, X_val, y_val, starting_model):
     return model, history
 
 
-# =========================================================
-# LOAD DATA
-# =========================================================
+#load data
 df, local_kwh_scaler_df, global_temp_min, global_temp_max, global_hum_min, global_hum_max = (
     Helper_functions.load_data(DATA_PATH, MAX_MIN_PATH, LOCAL_KWH_SCALING)
 )
 
 house_ids = sorted(df["LCLid"].astype(str).unique())
 
-# =========================================================
-# LOAD CLUSTER ASSIGNMENTS
-# =========================================================
+#load cluster assignments
 assignments_df = pd.read_csv(ASSIGNMENT_FILE)
 assignments_df["house_id"] = assignments_df["house_id"].astype(str)
 
@@ -124,7 +111,7 @@ if missing_assignments:
         f"{len(missing_assignments)} houses missing cluster assignments, e.g. {missing_assignments[:5]}"
     )
 
-# check model files exist
+#check model files exist
 for cluster_id, model_path in CLUSTER_MODEL_PATHS.items():
     if not model_path.exists():
         raise FileNotFoundError(f"Cluster model not found: {model_path}")
@@ -133,9 +120,7 @@ print("Cluster model paths:")
 for cluster_id, model_path in CLUSTER_MODEL_PATHS.items():
     print(f"  Cluster {cluster_id}: {model_path}")
 
-# =========================================================
-# MAIN LOOP
-# =========================================================
+#main loop
 results = []
 
 for i, house_id in enumerate(house_ids, start=1):
@@ -171,9 +156,7 @@ for i, house_id in enumerate(house_ids, start=1):
         print(f"Skipping {house_id}: insufficient samples after windowing")
         continue
 
-    # -------------------------------
-    # clustered FL baseline inference
-    # -------------------------------
+    #clustered FL evaluation before fine-tuning
     pred_scaled_clustered = starting_model.predict(house_x_val, verbose=0)
 
     clustered_metrics, _, _ = Helper_functions.evaluate_predictions_multistep(
@@ -183,9 +166,7 @@ for i, house_id in enumerate(house_ids, start=1):
         max_val=kwh_max
     )
 
-    # -------------------------------
-    # local fine-tuning
-    # -------------------------------
+    #clustered FL + fine-tuning evaluation
     fine_tuned_model, history = train_model(
         house_x_train, house_y_train,
         house_x_val, house_y_val,
@@ -224,9 +205,7 @@ for i, house_id in enumerate(house_ids, start=1):
         "best_epoch": int(np.argmin(history.history["val_loss"]) + 1)
     })
 
-# =========================================================
-# SAVE RESULTS
-# =========================================================
+#save results
 results_df = pd.DataFrame(results)
 results_df.to_csv("fine_tuned_LSTM64x32_clustered_per_house.csv", index=False)
 
@@ -254,7 +233,7 @@ print("Houses worsened in RMSE:", (results_df["delta_rmse"] < 0).sum())
 print("Houses improved in MAE:", (results_df["delta_mae"] > 0).sum())
 print("Houses worsened in MAE:", (results_df["delta_mae"] < 0).sum())
 
-# optional per-cluster summaries
+#per-cluster summaries
 cluster_summary_df = (
     results_df.groupby("cluster")
     .agg(

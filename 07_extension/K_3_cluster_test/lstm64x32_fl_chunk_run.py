@@ -23,9 +23,7 @@ from flwr.common import parameters_to_ndarrays, ndarrays_to_parameters
 import Helper_functions
 
 
-# ==========================================
-# STATIC CONFIG
-# ==========================================
+#settings
 SEED_BASE = 42
 HORIZON = 6
 WINDOW_SIZE = 24
@@ -58,9 +56,7 @@ BATCH_SIZE = 256
 LEARNING_RATE = 1e-3
 
 
-# ==========================================
-# UTILS
-# ==========================================
+
 def enable_gpu_memory_growth():
     gpus = tf.config.list_physical_devices("GPU")
     if gpus:
@@ -136,9 +132,7 @@ def load_cluster_house_ids(assignment_file, target_cluster):
     return cluster_house_ids
 
 
-# ==========================================
-# PRECOMPUTE PER-HOUSE NPZ IF NEEDED
-# ==========================================
+#per house npz files
 def precompute_client_npz():
     print("Creating per-house NPZ files...")
 
@@ -239,9 +233,7 @@ def load_manifest():
     return valid_house_ids, dummy_input_shape
 
 
-# ==========================================
-# FLOWER CLIENT
-# ==========================================
+#Flower client and strategy definitions
 class HouseClient(fl.client.NumPyClient):
     def __init__(self, model, house_id):
         self.model = model
@@ -296,9 +288,7 @@ def make_client_fn(valid_house_ids, dummy_input_shape):
     return client_fn
 
 
-# ==========================================
-# TRACKING STRATEGY
-# ==========================================
+#Serverstrategy
 class TrackingFedAvg(fl.server.strategy.FedAvg):
     def __init__(self, house_id_lookup, global_round_offset, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -360,9 +350,7 @@ class TrackingFedAvg(fl.server.strategy.FedAvg):
         return aggregated_parameters, aggregated_metrics
 
 
-# ==========================================
-# MAIN
-# ==========================================
+#Main FL loop
 def main():
     print("ENTERED fl_chunk_run main()", flush=True)
 

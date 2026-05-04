@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 Sample 10 unseen houses not used in the final locked 100-house cohort.
 """
 
-# --- 1. PATHS ---
+#paths
 raw_data_path = Path("../01_data_preparation/eligible_households_raw.parquet")
 final_locked_parquet_path = Path("final_locked_100.parquet")
 
@@ -20,7 +20,7 @@ plots_dir.mkdir(exist_ok=True)
 SEED = 6769
 N_SAMPLE = 10
 
-# --- 2. LOAD DATA ---
+#load data
 df = pd.read_parquet(raw_data_path)
 df["DateTime"] = pd.to_datetime(df["DateTime"])
 df["LCLid"] = df["LCLid"].astype(str)
@@ -33,7 +33,7 @@ final_locked_ids = (
     .tolist()
 )
 
-# --- 3. MANUAL BAD / REJECT IDS TO ALSO EXCLUDE ---
+#bad/rejected IDs from final cohort QA and other known issues (e.g. very short series, extreme outliers, etc.)
 bad_ids = [
     "MAC000020",
     "MAC000023",
@@ -54,14 +54,14 @@ bad_ids = [
 
 exclude_ids = sorted(set(final_locked_ids) | set(bad_ids))
 
-# --- 4. FIND ELIGIBLE UNSEEN HOUSES ---
+#find eligible unseen houses
 
 print(f"Final locked cohort IDs: {len(final_locked_ids)}")
 print(f"Bad/rejected IDs excluded: {len(set(bad_ids))}")
 print(f"Total excluded IDs: {len(exclude_ids)}")
 
 
-# --- HARD FILTER METRICS ---
+# apply hard filters - same as before
 print("Calculating hard-filter metrics...")
 
 house_stats = df.groupby("LCLid").agg(
@@ -91,7 +91,7 @@ print(f"Houses surviving hard filters and exclusions: {len(valid_houses_df)}")
 if len(valid_houses_df) < N_SAMPLE:
     raise ValueError(f"Not enough eligible unseen houses to sample {N_SAMPLE}.")
 
-# --- 5. RANDOM SAMPLE ---
+#sample randomly from the valid unseen houses
 rng = np.random.default_rng(SEED)
 sampled_ids = sorted(
     rng.choice(valid_houses_df["LCLid"].to_numpy(), size=N_SAMPLE, replace=False)
@@ -100,7 +100,7 @@ sampled_ids = sorted(
 print(f"\nSampled unseen houses ({N_SAMPLE}, seed={SEED}):")
 print(sampled_ids)
 
-# --- 6. SAVE IDS + PARQUET ---
+#save sampled IDs and parquet
 sampled_df = df[df["LCLid"].isin(sampled_ids)].copy()
 
 pd.DataFrame({"LCLid": sampled_ids}).to_csv(output_ids_path, index=False)
@@ -109,7 +109,7 @@ sampled_df.to_parquet(output_parquet_path, index=False)
 print(f"Saved sampled IDs to: {output_ids_path}")
 print(f"Saved sampled parquet to: {output_parquet_path}")
 
-# --- 7. QA PLOTS ---
+#check plots
 for i, house_id in enumerate(sampled_ids, start=1):
     house_df = sampled_df[sampled_df["LCLid"] == house_id].sort_values("DateTime")
 

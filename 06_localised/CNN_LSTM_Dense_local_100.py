@@ -50,8 +50,6 @@ feature_cols = [
     "weekend", "temperature", "humidity"
 ]
 
-
-
 #build model and compiler
 def build_nn(input_shape):
     model = Sequential([
@@ -71,8 +69,6 @@ def build_nn(input_shape):
         metrics=[tf.keras.metrics.RootMeanSquaredError()]
     )
     return model
-
-
 
 def train_one_model(X_train, y_train, X_val, y_val):
     model = build_nn(X_train.shape[1:])
@@ -94,9 +90,6 @@ def train_one_model(X_train, y_train, X_val, y_val):
     )
 
     return model, history
-
-
-
 
 df, local_kwh_scaler_df, global_temp_min, global_temp_max, global_hum_min, global_hum_max = Helper_functions.load_data(data_path, max_min_path, local_kwh_scaling)   #load global weather scalers and local kwh scalers
 #house_ids = sorted(df["LCLid"].unique())[:15]
@@ -124,7 +117,6 @@ for i, house_id in enumerate(house_ids, start=1):
 
     model, history = train_one_model(X_train, y_train, X_val, y_val)
     pred_scaled = model.predict(X_val, verbose=0)
-
 
     metrics, y_raw, pred_raw = Helper_functions.evaluate_predictions_multistep(
         y_scaled=y_val,
@@ -192,10 +184,7 @@ for i, house_id in enumerate(house_ids, start=1):
     
     plot_horizon = min(14 * 24, len(y_raw))
 
-    # ==========================================
-    # PLOT 1: Forecast for 1 Hour Ahead (t+1)
-    # Using column index 0: y_raw[:, 0]
-    # ==========================================
+    #1 hour ahead prediction plot
     plt.figure(figsize=(12, 4))
     plt.plot(y_raw[:plot_horizon, 0], label="Actual t+1")
     plt.plot(pred_raw[:plot_horizon, 0], label="Predicted t+1")
@@ -207,10 +196,7 @@ for i, house_id in enumerate(house_ids, start=1):
     plt.savefig(plots_dir/f"{house_id}_6step_tplus1.png", dpi=200)
     plt.close()
 
-    # ==========================================
-    # PLOT 2: Forecast for 3 Hours Ahead (t+3)
-    # Using column index 2: y_raw[:, 2]
-    # ==========================================
+    #3 hour ahead prediction plot
     plt.figure(figsize=(12, 4))
     plt.plot(y_raw[:plot_horizon, 2], label="Actual t+3")
     plt.plot(pred_raw[:plot_horizon, 2], label="Predicted t+3")
@@ -222,10 +208,7 @@ for i, house_id in enumerate(house_ids, start=1):
     plt.savefig(plots_dir/f"{house_id}_6step_tplus3.png", dpi=200)
     plt.close()
 
-    # ==========================================
-    # PLOT 3: Forecast for 6 Hours Ahead (t+6)
-    # Using column index 5: y_raw[:, 5]
-    # ==========================================
+    #6 hour ahead prediction plot
     plt.figure(figsize=(12, 4))
     plt.plot(y_raw[:plot_horizon, 5], label="Actual t+6")
     plt.plot(pred_raw[:plot_horizon, 5], label="Predicted t+6")

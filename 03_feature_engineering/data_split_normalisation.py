@@ -4,14 +4,14 @@ from pathlib import Path
 
 
 '''
-**step 4**
-Get global and local household scalers
-Same as global scalers, but min max kwh computed for each house and saved to csv for later processing
+**step 3**
+Get local household scalers
+min max kwh computed for each house and saved to csv for later processing
 
-Returns data normalised parquet file (containing all household data + features + train, val, test split catagory)
+Returns data normalised parquet file (containing all household data + features + train, val, test split category)
 Returns Global scaler csv for temp and humidity + local household scaler csv for demand
 
-*these files can be used to train and run inference*
+*To be used to train and run inference*
 '''
 
 hourly_path = Path("household_weather_merged.parquet")
@@ -28,6 +28,7 @@ assert TRAIN_DAYS + VAL_DAYS + TEST_DAYS == 789
 
 HOURS_PER_DAY = 24
 
+#get samples per set
 TRAIN_LEN = TRAIN_DAYS * HOURS_PER_DAY
 VAL_LEN = VAL_DAYS * HOURS_PER_DAY
 TEST_LEN = TEST_DAYS * HOURS_PER_DAY
@@ -70,14 +71,14 @@ for house_id in house_ids:
     val_df = house.iloc[train_end:val_end].copy()
     test_df = house.iloc[val_end:].copy()
 
-    #find min max values
+    #find min max values **only on training set**
     kwh_min = train_df["kwh"].min()
     kwh_max = train_df["kwh"].max()
 
     if kwh_max == kwh_min:
         raise ValueError(f"{house_id}: kwh_min and kwh_max cannot be equal")
 
-    house_splits[house_id] = {
+    house_splits[house_id] = {      #get the min and max values per household, store in dictionary for later use
         "train": train_df,
         "val": val_df,
         "test": test_df
@@ -119,16 +120,16 @@ if global_temp_max == global_temp_min:
 
 if global_hum_max == global_hum_min:
     raise ValueError("Global humidity min and max are equal; cannot apply min-max scaling.")
-# --------------------------------------------------
-# MIN-MAX SCALE KWH ONLY
-# --------------------------------------------------
+
+#min max scaling function to be applied to all train, val and test sets for each house for both weather and energy data
 def minmax_scale(series, min_val, max_val):
     return (series - min_val) / (max_val - min_val)
 
 
 #apply min max scaling for all sets (train, val, test)
 for house_id in house_ids:
-    #energy usage data
+    
+    #demand data - extract min and max values for current house
     house_kwh_min = house_kwh_scalers[house_kwh_scalers["house_id"] == house_id]["kwh_min"].item()
     house_kwh_max = house_kwh_scalers[house_kwh_scalers["house_id"] == house_id]["kwh_max"].item()
 
@@ -196,7 +197,7 @@ print(splits_df)
 print(splits_df.shape)
 print(splits_df["split"].value_counts())
 
-#sanity check, make sure between 0 and 1
+#make sure between 0 and 1
 print("\nScaled train temperature range:")
 print(splits_df.loc[splits_df["split"] == "train", "temperature"].min(),
       splits_df.loc[splits_df["split"] == "train", "temperature"].max())
@@ -209,16 +210,16 @@ print("\nScaled train kwh range:")
 print(splits_df.loc[splits_df["split"] == "train", "kwh"].min(),
       splits_df.loc[splits_df["split"] == "train", "kwh"].max())
 
-splits_df.to_parquet("final_locked_100_normalised.parquet", index=False)
+splits_df.to_parquet("final_locked_100_normalised.parquet", index=False)    #final dataframe ready for training and inference saved to parquet
 
 pd.DataFrame({
     "global_temp_min": [global_temp_min],
     "global_temp_max": [global_temp_max],
     "global_hum_min": [global_hum_min],
     "global_hum_max": [global_hum_max],
-}).to_csv("global_weather_scaler.csv", index=False)
+}).to_csv("global_weather_scaler.csv", index=False) #weather data scalings for reference
 
-house_kwh_scalers.to_csv("local_kwh_scaler.csv", index=False)
+house_kwh_scalers.to_csv("local_kwh_scaler.csv", index=False)   #scaler files for later unscaling of demand data
 
 
 

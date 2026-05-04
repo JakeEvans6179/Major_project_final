@@ -3,22 +3,8 @@ import numpy as np
 import pandas as pd
 
 """
-**step 3**
-Preprocess the 10 unseen households:
 
-- load fixed-window raw rows
-- reindex each house to the expected 30-minute timeline
-- forward fill missing kwh
-- backfill only if the first value is missing
-- shift timestamps back 30 mins
-- aggregate to hourly kwh
-- add time features
-- combine all houses into one dataframe
-- save to parquet
-
-**updated
-Load in the processed weather data and merge into dataset in this script
-Normalise in next script
+Extract weather data, perform time encodings and merge to demand data
 """
 
 # --------------------------------------------------
@@ -43,9 +29,7 @@ expected_index_30m = pd.date_range(
 
 print("Expected 30-min points per house:", len(expected_index_30m))
 
-# --------------------------------------------------
-# LOAD
-# --------------------------------------------------
+#load data
 df = pd.read_parquet(raw_parquet)
 
 df["DateTime"] = pd.to_datetime(df["DateTime"], errors="coerce")
@@ -57,9 +41,7 @@ print(df.head())
 print("Unique houses:", df["LCLid"].nunique())
 print("Raw shape:", df.shape)
 
-# --------------------------------------------------
-# HOUSE PREPROCESS FUNCTION
-# --------------------------------------------------
+#preprocess per household
 def preprocess_one_house(house_df, house_id):
     house = house_df.copy()
 
@@ -118,9 +100,7 @@ def preprocess_one_house(house_df, house_id):
     return hourly
 
 
-# --------------------------------------------------
-# RUN FOR ALL HOUSES
-# --------------------------------------------------
+#preprocess all houses and combine into one dataframe
 processed = []
 
 house_ids = sorted(df["LCLid"].unique())

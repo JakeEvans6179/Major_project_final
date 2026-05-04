@@ -8,27 +8,29 @@ import numpy as np
 Script for accessing household data and filtering
 Filter out ToU and only use standard tarrif data
 
+Only keep households with data spanning the full window (01-01-2012 to 28-02-2014)
+
 Remove duplicate readings, calculate total duration of each house and compute coverage ratio (ratio of valid readings/ total expected readings)
 
-Colect all eligible houses for plotting
+Collect all eligible houses for sampling
 '''
 parquet_file = Path("saved_householddata.parquet")
 WINDOW_DURATION = 789       #01-01-2012 --> 28-02-2014
 
 
-# IF STATEMENT: Check if the file already exists
+#check if the file already exists - load parquet file directly
 if parquet_file.exists():
     print(f"Found {parquet_file.name} Loading data directly")
-    # Instantly load the compiled data
+    #load the compiled data
     all_df = pd.read_parquet(parquet_file)
 
 else:
     print(f"{parquet_file.name} not found. Processing raw CSVs...")
 
-    # folder containing all partitioned CSVs
+    #demand data from dataset
     data_folder = Path(r"../data/Partitioned LCL Data")
 
-    # find all csv files recursively
+    #find all csv files 
     csv_files = sorted(data_folder.rglob("*.csv"))
     print(f"Found {len(csv_files)} CSV files")
 
@@ -45,31 +47,30 @@ else:
 
         temp = temp.rename(columns={"KWH/hh (per half hour) ": "kwh"})
 
-        # convert types
+        #convert to datetime and numeric, errors set to NaN
         temp["DateTime"] = pd.to_datetime(temp["DateTime"], errors="coerce")
         temp["kwh"] = pd.to_numeric(temp["kwh"], errors="coerce")
 
-        # keep only standard tariff houses
+        #keep only standard tariff houses
         temp = temp[temp["stdorToU"] == "Std"].copy()
 
         dfs.append(temp)
 
-    # combine into one dataframe
+    #combine into one dataframe
     all_df = pd.concat(dfs, ignore_index=True)
 
-    # remove exact duplicates
+    #remove exact duplicates
     all_df = all_df.drop_duplicates(subset=["LCLid", "stdorToU", "DateTime", "kwh"])
 
-    # drop std rating
-
+    #remove tariff type as all common now
     all_df = all_df.drop(columns=["stdorToU"])
 
-    # Save to parquet file so the IF statement catches it next time
+    #save raw data to parquet file for faster loading
     all_df.to_parquet(parquet_file, index=False)
     print("Finished processing and saved to Parquet.")
 
 
-# --- Regardless of how it was loaded, your data is now ready here ---
+#data ready for analysis and filtering
 print("\n--- Data Summary ---")
 print(all_df.head())
 print("Shape:", all_df.shape)
@@ -120,11 +121,11 @@ print(all_df)
 
 print("Calculating household stats (Duration, coverage)")
 household_stats = (
-    all_df.groupby("LCLid") #takes dataset and splits into smaller chunks (one per house)
-    .agg(       #extracts summary statistics for each house
-        First_timestep=("DateTime", "min"), #gets first (min) datetime house was recorded
+    all_df.groupby("LCLid")                                     #takes dataset and splits into smaller chunks (one per house)
+    .agg(                                                       #extracts summary statistics for each house
+        First_timestep=("DateTime", "min"),                     #gets first (min) datetime house was recorded
         Last_timestep=("DateTime", "max"),
-        Valid_count=("kwh", lambda x: x.notna().sum())      #counts number of rows with actual numbers (ignore NaN/ missing values)
+        Valid_count=("kwh", lambda x: x.notna().sum())          #counts number of rows with actual numbers (ignore NaN/ missing values)
     ).reset_index().rename(columns={"LCLid": "Household_id"})   #rename column to Household_id
 )
 
@@ -135,19 +136,19 @@ household_stats["Total_count"] = (
     ((household_stats["Last_timestep"] - household_stats["First_timestep"]).dt.total_seconds() / (30 * 60)) #How many readings house should have in the interval
     .round()
     .astype(int)
-    + 1 #Add one to account for initial starting point
+    + 1 
 )
 
 household_stats["Coverage"] = household_stats["Valid_count"] / household_stats["Total_count"]   #find ratio of readings with data to total readings expected in period
 
-# record length in days
+#length in days
 household_stats["Span_days"] = (
     (household_stats["Last_timestep"] - household_stats["First_timestep"]).dt.total_seconds()
     / (24 * 60 * 60)
 )
 
 print("Household comparison stats:")
-print(household_stats) #all house metrics are calculated
+print(household_stats) #all house metrics calculated
 
 
 '''
@@ -157,11 +158,8 @@ New
 #Find houses within a fixed date window allowing for direct comparison
 
 
-print(household_stats["Last_timestep"].value_counts().head(20)) #see most common last timesteps
+print(household_stats["Last_timestep"].value_counts().head(20)) #see most common end dates - most common is 2014-02-28 00:00:00
 
-#print("something")
-#wait = input("Press Enter to continue.")
-#print("something")
 
 common_end = pd.Timestamp("2014-02-28 00:00:00")
 common_start = common_end - pd.Timedelta(days=WINDOW_DURATION)
@@ -182,7 +180,7 @@ print(valid_houses)
 eligible_ids = valid_houses["Household_id"].tolist()        #save house ids to list to filter for the eligible houses later
 
 window_df = all_df[
-    (all_df["DateTime"] >= common_start) &      #only include houses from eligible list, starting and stopping from a fixed time
+    (all_df["DateTime"] >= common_start) &                  #only include houses from eligible list, starting and stopping from a fixed time
     (all_df["DateTime"] <= common_end) &
     (all_df["LCLid"].isin(eligible_ids))
 ].copy()
@@ -195,8 +193,8 @@ print(window_df)
 #good_houses = household_stats[(household_stats['Coverage'] > 0.99) & (household_stats["Span_days"] > 800)]
 expected_count = WINDOW_DURATION * 48 + 1
 
-print("Eligible houses spanning full window:", len(valid_houses))       #counts rows after removing duplication, filtering and removing off grid value
-print("Expected timestamps per house:", expected_count)         #counts total number of rows per house assuming perfect data
+print("Eligible houses spanning full window:", len(valid_houses))                   #counts rows after removing duplication, filtering and removing off grid value
+print("Expected timestamps per house:", expected_count)                             #counts total number of rows per house assuming perfect data
 print("Expected total rows if complete:", expected_count * len(valid_houses))       #total number of rows assuming perfect data across all households
 print("Actual rows in window_df:", len(window_df))
 print("Missing rows vs perfect completeness:", expected_count * len(valid_houses) - len(window_df))
@@ -227,15 +225,15 @@ print("\nFixed-window household stats:")
 print(window_stats.head())
 print(window_stats["Coverage"].describe())
 
-#final quality filter
+#check to see if housees have 99% coverage in window
 good_houses = window_stats[window_stats["Coverage"] > 0.99].copy()
 
 print("\nGood houses after fixed-window filter:", len(good_houses))
 print(good_houses.head())
 
-# ---------------------------------------------------
-# Randomly sample 100 UNIQUE household IDs
-# ---------------------------------------------------
+'''
+Perform filtering and add all houses that meet the criteria to the candidate pool for later sampling
+'''
 print("\nRandomly selecting household IDs from eligible list")
 rng = np.random.default_rng(6769)
 
@@ -256,23 +254,14 @@ selected_houses_lst = pd.DataFrame({"Household_id": selected_ids})
 print(selected_houses_lst)
 print("Selected houses:", len(selected_houses_lst))
 
-# ---------------------------------------------------
-# Filter raw fixed-window data to houses
-# ---------------------------------------------------
+#raw eligible household data saved for sampling
 selected_houses = window_df[window_df["LCLid"].isin(selected_ids)].copy()
 
 print("\nSelected raw rows:")
 print(selected_houses)
 print("Unique selected houses:", selected_houses["LCLid"].nunique())
 print("Selected raw shape:", selected_houses.shape)
-'''
-# Optional save
-selected_100.to_csv("selected_100_houses_fixed800d.csv", index=False)
-selected_houses.to_parquet("selected_100_households_raw_fixed800d.parquet", index=False)
-good_houses.to_csv("good_houses_fixed800d.csv", index=False)
-window_stats.to_csv("window_stats_fixed800d.csv", index=False)
 
-'''
 #save to parquet for training script to use
 selected_houses.to_parquet("eligible_households_raw.parquet", index=False)
 

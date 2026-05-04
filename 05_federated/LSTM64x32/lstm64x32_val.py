@@ -30,15 +30,11 @@ data_path = Path("../data_files/final_locked_100_normalised.parquet")
 max_min_path = Path("../data_files/global_weather_scaler.csv")
 local_kwh_scaling = Path("../data_files/local_kwh_scaler.csv")
 
-
-
-
 HORIZON = 6
 WINDOW_SIZE = 24
 TARGET_COL = "kwh"
 
 num_chunks = 100
-
 
 #model input features
 feature_cols = [
@@ -49,23 +45,16 @@ feature_cols = [
     "weekend", "temperature", "humidity"
 ]
 
-
-
-
 df, local_kwh_scaler_df, global_temp_min, global_temp_max, global_hum_min, global_hum_max = Helper_functions.load_data(data_path, max_min_path, local_kwh_scaling)   #load global weather scalers and local kwh scalers
 #house_ids = sorted(df["LCLid"].unique())[:15]
 house_ids = sorted(df["LCLid"].unique())
 #results = []
 
-
 x_val = []
 y_val = []
 
-
 val_data = {}
     
-
-
 for i, house_id in enumerate(house_ids, start = 1):
     print(f"Processing {i}/{len(house_ids)}: {house_id}")
 
@@ -75,7 +64,6 @@ for i, house_id in enumerate(house_ids, start = 1):
     #house_x_train, house_y_train = Helper_functions.make_xy(train_df, window_size=WINDOW_SIZE, target_col=TARGET_COL, horizon = HORIZON)
     house_x_val, house_y_val = Helper_functions.make_xy(val_df, window_size=WINDOW_SIZE, target_col=TARGET_COL, horizon = HORIZON)
     
-
     if len(house_x_val) == 0:
         print(f"Skipping {house_id}: insufficient samples after windowing")
         continue
@@ -88,7 +76,6 @@ for i, house_id in enumerate(house_ids, start = 1):
 
     #store x_val, y_val and min max kwh values in dictionary sorted by house_id
 
-
     val_data[house_id] = {
         "x_val": house_x_val,
         "y_val": house_y_val,
@@ -96,13 +83,9 @@ for i, house_id in enumerate(house_ids, start = 1):
         "kwh_max": kwh_max
     }
 
-
-
 print("Number of houses in val_data:", len(val_data))
 
 chunk_val_metrics = {}
-
-
 
 #First loop through all models to determine the performance of each, plot the validation loss against communication chunks
 for i in range(1, num_chunks + 1):
@@ -116,7 +99,6 @@ for i in range(1, num_chunks + 1):
     #now evaluate the model on the global validation set and plot the validation loss against communication chunks
     for house_id in val_data.keys():
         
-
         pred_scaled = model.predict(val_data[house_id]["x_val"], verbose=0)
         kwh_min = float(val_data[house_id]["kwh_min"])
         kwh_max = float(val_data[house_id]["kwh_max"])
@@ -136,7 +118,6 @@ for i in range(1, num_chunks + 1):
     chunk_val_metrics[i] = mean_val_rmse
     print(f"Chunk {i}: Mean RMSE across horizons on global validation set: {mean_val_rmse:.4f}")
 
-
 #plot the validation loss against communication chunks
 plt.figure(figsize=(10, 6))
 plt.plot(list(chunk_val_metrics.keys()), list(chunk_val_metrics.values()), marker='o')
@@ -145,9 +126,6 @@ plt.xlabel("Communication Chunk")
 plt.ylabel("Mean RMSE across horizons")
 plt.savefig("validation_loss_vs_chunks.png")
 plt.close()
-
-        
-    
 
 summary_df = pd.DataFrame({
     "chunk": list(chunk_val_metrics.keys()),

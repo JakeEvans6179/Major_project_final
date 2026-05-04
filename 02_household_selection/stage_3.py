@@ -6,7 +6,7 @@ from pathlib import Path
 '''
 Sample new replacement candidates for stage 3.
 '''
-# --- 1. CONFIGURATION ---
+#data paths
 data_path = Path("../01_data_preparation/eligible_households_raw.parquet")              # full raw candidate pool
 original_sample_path = Path("stage_1_100households.parquet")     # raw data for original sampled 100
 stage2_ids_path = Path("stage2_replacement_candidates.csv")      # 22 stage 2 candidate IDs
@@ -14,13 +14,13 @@ plots_dir = Path("stage3_qa_plots")
 plots_dir.mkdir(exist_ok=True)
 SEED = 6769
 
-# --- 2. LOAD DATA ---
+#load data
 print("Loading raw dataset...")
 df = pd.read_parquet(data_path)
 df["DateTime"] = pd.to_datetime(df["DateTime"])
 df["LCLid"] = df["LCLid"].astype(str)
 
-# Original sampled 100 IDs
+#original sampled ids
 original_house_ids = (
     pd.read_parquet(original_sample_path)["LCLid"]
     .astype(str)
@@ -28,16 +28,14 @@ original_house_ids = (
     .tolist()
 )
 
-# Stage 2 replacement candidate IDs (the 22 candidates you reviewed)
+#stage 2 replacement candidates
 stage2_ids = (
     pd.read_csv(stage2_ids_path)["LCLid"]
     .astype(str)
     .tolist()
 )
 
-# All rejected IDs so far:
-# - original 22 rejects
-# - rejected stage 2 replacements
+#all rejected ids 
 BAD_IDS = [
     "MAC000020",    #stage 1 rejects
     "MAC000023",
@@ -72,7 +70,7 @@ print(f"Original sampled households: {len(original_house_ids)}")
 print(f"Approved Stage 2 replacements kept: {len(approved_s2_ids)}")
 print(f"New replacements needed now: {num_resamples}")
 
-# --- 3. CALCULATE HARD-FILTER METRICS ---
+#metrics for filtering
 print("Calculating hard-filter metrics...")
 house_stats = df.groupby("LCLid").agg(
     total_readings=("kwh", "count"),
@@ -84,7 +82,7 @@ house_stats = df.groupby("LCLid").agg(
 
 house_stats["zeros_ratio"] = house_stats["zeros_count"] / house_stats["total_readings"]
 
-# Apply hard filters + exclusion rules
+#apply hard filters to eligible household pool, excluding original sample, approved stage 2 replacements, and all known bad IDs
 valid_houses_df = house_stats[
     (house_stats["zeros_ratio"] <= 0.05) &
     (house_stats["std_kwh"] >= 0.05) &
@@ -105,7 +103,7 @@ if len(valid_houses_df) < num_resamples:
     )
 
 valid_houses_df = valid_houses_df.sort_values("LCLid").reset_index(drop=True)
-# --- 4. SAMPLE NEW REPLACEMENT CANDIDATES ---
+#sample new replacements
 rng = np.random.default_rng(seed=SEED)
 
 stage3_resampled_ids = sorted(
@@ -119,13 +117,13 @@ pd.DataFrame({"LCLid": stage3_resampled_ids}).to_csv(
 )
 print("Saved replacement IDs to 'stage3_replacement_candidates.csv'.")
 
-# Optional: save approved Stage 2 replacements for bookkeeping
+'''
 pd.DataFrame({"LCLid": approved_s2_ids}).to_csv(
     "approved_stage2_replacement_ids.csv", index=False
 )
-
-# --- 5. PLOT FOR MANUAL CHECK ---
-print("\nGenerating QA plots for visual inspection...")
+'''
+#plot
+print("\nplotting for visual inspection")
 replacement_raw_df = df[df["LCLid"].isin(stage3_resampled_ids)].copy()
 
 for i, house_id in enumerate(stage3_resampled_ids, start=1):
@@ -143,7 +141,7 @@ for i, house_id in enumerate(stage3_resampled_ids, start=1):
     plt.close()
 
     if i % 10 == 0 or i == len(stage3_resampled_ids):
-        print(f"Plotted {i}/{len(stage3_resampled_ids)} houses...")
+        print(f"Plotted {i}/{len(stage3_resampled_ids)} houses")
 
 print("Done.")
 

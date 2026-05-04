@@ -1,23 +1,77 @@
 1. 01_data_preparation
-
+    * Extract household data from Low Carbon London dataset
+    * Perform initial filtering to remove variable tariff households 
+    * Remove duplicates and invalid entries
+    * Retain households with data coverage of more than 99% during the fixed study window
+    * Retain households covering the required study period
 
 2. 02_household_selection
-
+    * Apply filters to filter out implausible or inactive households
+    * Filters include:
+        * Minimum standard deviation
+        * Maximum half-hourly demand threshold
+        * Maximum zero-reading ratio
+    * Carry out manual quality check to remove households which passed filters but still remain implausible
+    * Finalise selected household cohort
 
 3. 03_feature_engineering
-
+    * Extract weather data for study period
+    * Perform cleaning, remove duplicates and forward filling missing values
+    * Forward fill missing demand data 
+    * Aggregate demand data to hourly
+    * Merge weather and demand data
+    * Create input features including:
+        * Household demand
+        * Temperature
+        * Relative Humidity
+        * time of day sin/cos encodings
+        * day of week sin/cos encodings
+        * time of year sin/cos encodings
+    * Split datatset into train, val, test split chronologically to prevent data leakage
+    * Perform min-max scaling using training data only
+    * Demand scaling performed per household, allowing models to focus on shape rather than magnitude 
 
 4. 04_centralised
-
+    * Centralised screening + model shortlisting using pooled household data
+    * Use Fixed seed used to allow for fair comparison
+    * Centralised + Fine tuning testing 
+    * Models tested:
+        * CNN-LSTM hybrid models + Fully connected layer head variants
+        * LSTM models + Fully connected layer head variants
+        * Encoder Decoder model
+        * Non recurrent dense/MLP baseline
 
 5. 05_federated
-
+    * Carry forward shortlisted models from centralised screening
+    * Train models using Federated learning only
+    * Train models using Federated learning + fine-tuning
+    * Use FedAvg algorithm
+    * Used 200 communication rounds and fit fraction of 0.3 to manage computational cost
+    * Compare performance using validation set RMSE and MAE
 
 6. 06_localised
-
+    * Trained one model per household using shortlisted models 
+    * Persistence used as a naive baseline
+    * SARIMA used as a traditional household-level forecasting benchmark
+    * Compare performance using validation set RMSE and MAE
+  
 
 7. 07_extension
-
+    * Carry out extension studies on selected LSTM64_32 model
+    * Performed K-means clustering on average daily load profiles of each household
+    * Trained one FL model per cluster to determine if clustered FL helps performance
+    * Tested extended communication rouinds to check if FL performance further improves beyond inital 200-round budget
 
 8. 08_blind_house_test
+    * Sampled 10 random households from eligible households which weren't in the main 100-household training cohort
+    * Used limited data to test if FL + FT with LSTM64_32 model still retained its advantage over SARIMA 
+    * Limited data split:
+        * 5 days training
+        * 2 days validation
+        * 7 days test
+    * Comparing:
+        * Pretrained FL model
+        * Pretrained FL model + local fine-tuning
+        * SARIMA
+    * Use test to see if selected FL+ fine-tuning pipeline adapts to unseen households with limited data
 

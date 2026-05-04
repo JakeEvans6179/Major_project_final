@@ -48,7 +48,7 @@ local_kwh_scaling = Path("unseen_local_kwh_scaler.csv")
 TARGET_COL = "kwh"
 HORIZON = 6
 
-# Use full 2-day validation block for candidate search
+#Use 2-day validation block for candidate search
 VAL_SEARCH_HOURS = 24 * 2
 
 # Candidate grid
@@ -311,9 +311,7 @@ def search_best_sarima(train_series, val_series_search, house_id=None):
     return best, search_df
 
 
-# ============================================================
-# Main benchmark loop
-# ============================================================
+#main loop
 
 df, local_kwh_scaler_df, global_temp_min, global_temp_max, global_hum_min, global_hum_max = (
     Helper_functions.load_data(data_path, max_min_path, local_kwh_scaling)
@@ -466,9 +464,7 @@ for i, house_id in enumerate(house_ids, start=1):
                 index=False
             )
 
-# ============================================================
-# Save outputs
-# ============================================================
+#save outputs
 
 results_df = pd.DataFrame(results)
 

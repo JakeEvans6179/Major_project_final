@@ -35,11 +35,9 @@ max_min_path = Path("../03_feature_engineering/global_weather_scaler.csv")
 
 local_kwh_scaling = Path("../03_feature_engineering/local_kwh_scaler.csv")
 
-
 HORIZON = 6
 WINDOW_SIZE = 24
 TARGET_COL = "kwh"
-
 
 #model input features
 feature_cols = [
@@ -49,8 +47,6 @@ feature_cols = [
     "dow_sin", "dow_cos",
     "weekend", "temperature", "humidity"
 ]
-
-
 
 #build model and compiler
 def build_nn(input_shape):

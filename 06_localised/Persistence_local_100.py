@@ -12,11 +12,9 @@ Definition:
 For each sample, predict the next 6 hours as equal to the most recent
 observed kWh value at the end of the 24-hour input window.
 
-This is the direct multi-step persistence baseline aligned with the
+direct multi-step persistence baseline aligned with the
 6-step neural models.
 """
-
-
 
 data_path = Path("../03_feature_engineering/final_locked_100_normalised.parquet")
 
@@ -56,7 +54,7 @@ for i, house_id in enumerate(house_ids, start=1):
 
         
 
-        # Need enough points for a 24-hour input window plus 6 target hours
+        #24-hour input window plus 6 target hours
         n_samples = len(val_kwh) - WINDOW_SIZE - HORIZON + 1
         if n_samples <= 0:
             print(f"Skipping {house_id}: insufficient validation samples")
@@ -66,13 +64,13 @@ for i, house_id in enumerate(house_ids, start=1):
         pred_scaled = []
 
         for s in range(n_samples):
-            # Last observed point in the input window
+            #laSt observed kWh value at the end of the input window
             last_val = val_kwh[s + WINDOW_SIZE - 1]
 
-            # True next 6 hours
+            #next 6 hours of demand data to compare against persistence prediction
             future_vals = val_kwh[s + WINDOW_SIZE : s + WINDOW_SIZE + HORIZON]
 
-            # Persistence prediction: repeat last observed value
+            #persistence prediction: next 6 hours all equal to last observed value
             pred_vals = np.array([last_val, last_val, last_val, last_val, last_val, last_val], dtype=np.float32)
 
             y_val.append(future_vals)
@@ -107,8 +105,6 @@ for i, house_id in enumerate(house_ids, start=1):
             "n_val_samples": len(y_val),
         })
 
-        
-
         print(
             f"[{i}/{len(house_ids)}] Finished {house_id} | "
             f"Mean RMSE across horizons: {metrics['mean_rmse_across_horizons']:.6f}"
@@ -116,7 +112,6 @@ for i, house_id in enumerate(house_ids, start=1):
 
     except Exception as e:
         print(f"Failed on {house_id}: {e}")
-
 
 results_df = pd.DataFrame(results)
 if results_df.empty:

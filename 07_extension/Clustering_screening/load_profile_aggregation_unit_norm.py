@@ -9,26 +9,9 @@ from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_har
 import Helper_functions
 
 """
-Build 24-hour average daily load profiles for each house using TRAIN data only,
-then apply row-wise unit normalisation so clustering focuses on SHAPE rather
-than absolute profile level.
-
-Outputs:
-1. household_24h_train_profiles_raw.csv
-   - one row per house
-   - columns h00 ... h23 are raw averaged normalized-kwh values
-
-2. household_24h_train_profiles_rowu.csv
-   - same layout, but each row unit-normalised across its own 24 hours
-
-3. kmeans_k_sweep_metrics_rowu.csv
-   - clustering metrics for each k
-
-4. kmeans_assignments_rowu_k{k}.csv
-   - house_id to cluster assignment for each k
-
-5. cluster_centroids_rowu_k{k}.png
-   - mean raw 24h profiles per cluster, plotted for interpretation
+Build 24-hour average daily load profiles for each house using training data only,
+apply row-wise unit normalisation so clustering focuses on shape 
+Run Kmeans for k=2 to 6 and save metrics for each K and cluster assignments for each house.
 """
 
 DATA_PATH = Path("../data_files/final_locked_100_normalised.parquet")
@@ -42,18 +25,14 @@ OUT_METRICS = Path("kmeans_k_sweep_metrics_rowu.csv")
 K_VALUES = [2, 3, 4, 5, 6]
 FEATURE_COLS = [f"h{h:02d}" for h in range(24)]
 
-# --------------------------------------------------
-# Step 1: Load data
-# --------------------------------------------------
+#load data
 df, local_kwh_scaler_df, global_temp_min, global_temp_max, global_hum_min, global_hum_max = (
     Helper_functions.load_data(DATA_PATH, MAX_MIN_PATH, LOCAL_KWH_SCALING)
 )
 
 house_ids = sorted(df["LCLid"].unique())
 
-# --------------------------------------------------
-# Step 2: Build raw 24-hour average profiles
-# --------------------------------------------------
+#build average 24-hour profiles for each house using training data only
 profile_rows = []
 
 for house_id in house_ids:
@@ -76,7 +55,7 @@ for house_id in house_ids:
         .reindex(range(24))
     )
 
-    # Safety fill in case an hour is missing
+    #ffill, bfil just in case
     hourly_mean = hourly_mean.interpolate(limit_direction="both").ffill().bfill()
 
     row = {"house_id": house_id}
@@ -96,9 +75,7 @@ print(hourly_profiles_raw.head())
 
 hourly_profiles_raw.to_csv(OUT_RAW, index=False)
 
-# --------------------------------------------------
-# Step 3: Row-wise unit normalisation
-# --------------------------------------------------
+#unit normalisation per row so clustering focuses on shape rather than magnitude
 cluster_features_raw = hourly_profiles_raw[FEATURE_COLS].copy()
 
 row_norms = np.sqrt((cluster_features_raw ** 2).sum(axis=1)).replace(0, np.nan)
@@ -119,12 +96,10 @@ print(hourly_profiles_rowu.head())
 
 hourly_profiles_rowu.to_csv(OUT_ROWU, index=False)
 
-# This is what KMeans will use
+#prepare KMeans input
 X = cluster_features_rowu.copy()
 
-# --------------------------------------------------
-# Step 4: KMeans sweep
-# --------------------------------------------------
+#Kmeans clustering and eval
 results = []
 
 for k in K_VALUES:
@@ -133,8 +108,8 @@ for k in K_VALUES:
     kmeans = KMeans(
         n_clusters=k,
         random_state=42,
-        n_init=1000,
-        max_iter=1000,
+        n_init=1000,        #perform 1000 random initialisations to avoid local minima
+        max_iter=1000,      #perfrom up to 1000 iterations per run to ensure convergence
         tol=1e-6,
     )
 
@@ -177,9 +152,7 @@ results_df.to_csv(OUT_METRICS, index=False)
 print("\nKMeans sweep results:")
 print(results_df)
 
-# --------------------------------------------------
-# Step 5: Plot cluster mean RAW profiles for interpretation
-# --------------------------------------------------
+#plot cluster centroids for each K
 for k in K_VALUES:
     assignments = pd.read_csv(f"kmeans_assignments_rowu_k{k}.csv")
     df_merged = hourly_profiles_raw.merge(assignments, on="house_id")

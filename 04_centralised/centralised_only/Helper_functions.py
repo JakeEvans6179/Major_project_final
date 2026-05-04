@@ -84,12 +84,6 @@ def make_xy(df_house: pd.DataFrame, window_size: int = 24, target_col: str = "kw
     If horizon = 3:
         y shape will be (n_samples, 3)
 
-    Example:
-        window_size = 24
-        horizon = 3
-
-        X sample = hours [t-23 ... t]
-        y sample = [t+1, t+2, t+3]
     """
     values = df_house.to_numpy(dtype=np.float32)
     target_idx = df_house.columns.get_loc(target_col)
@@ -97,7 +91,7 @@ def make_xy(df_house: pd.DataFrame, window_size: int = 24, target_col: str = "kw
     X = []
     y = []
 
-    # Need enough room for both the input window and the forecast horizon
+    #need enough room for both the input window and the forecast horizon
     for i in range(len(values) - window_size - horizon + 1):
         X.append(values[i:i + window_size])
         y.append(values[i + window_size:i + window_size + horizon, target_idx])

@@ -24,10 +24,8 @@ from flwr.common import parameters_to_ndarrays, ndarrays_to_parameters
 import Helper_functions
 
 
-# ==========================================
-# STATIC CONFIG
-# ==========================================
-SEED_BASE = 42
+#configuration settings
+SEED_BASE = 42  #base value, incremented by chunk index to ensure different seed per chunk 
 HORIZON = 6
 WINDOW_SIZE = 24
 TARGET_COL = "kwh"
@@ -59,9 +57,7 @@ BATCH_SIZE = 256
 LEARNING_RATE = 1e-3
 
 
-# ==========================================
-# UTILS
-# ==========================================
+
 def enable_gpu_memory_growth():
     gpus = tf.config.list_physical_devices("GPU")
     if gpus:
@@ -113,9 +109,7 @@ def weighted_average(metrics):
     return aggregated
 
 
-# ==========================================
-# PRECOMPUTE PER-HOUSE NPZ IF NEEDED
-# ==========================================
+#compute per house NPZ files for faster loading during FL rounnds
 def precompute_client_npz():
     print("Creating per-house NPZ files...")
 
@@ -216,9 +210,7 @@ def load_manifest():
     return valid_house_ids, dummy_input_shape
 
 
-# ==========================================
-# FLOWER CLIENT
-# ==========================================
+#client class, loading data from NPZ files during fit rounds
 class HouseClient(fl.client.NumPyClient):
     def __init__(self, model, house_id):
         self.model = model
@@ -295,9 +287,7 @@ def make_client_fn(valid_house_ids, dummy_input_shape):
     return client_fn
 
 
-# ==========================================
-# TRACKING STRATEGY
-# ==========================================
+#define the server strategy using FedAvg, extended to log selected clients and validation metrics (unused) per round
 class TrackingFedAvg(fl.server.strategy.FedAvg):
     def __init__(self, house_id_lookup, global_round_offset, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -379,9 +369,7 @@ class TrackingFedAvg(fl.server.strategy.FedAvg):
         return aggregated_loss, aggregated_metrics
 
 
-# ==========================================
-# MAIN
-# ==========================================
+#main function to run one chunk of FL rounds
 def main():
     print("ENTERED fl_chunk_run main()", flush=True)
     parser = argparse.ArgumentParser()
@@ -432,7 +420,7 @@ def main():
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     print("STARTING FLOWER SIMULATION", flush=True)
-    fl.simulation.start_simulation(
+    fl.simulation.start_simulation(     #starts the flower simulation, creating server internally and clients through client_fn
         client_fn=client_fn,
         num_clients=num_clients,
         config=fl.server.ServerConfig(num_rounds=args.chunk_rounds),

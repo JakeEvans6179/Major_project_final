@@ -18,16 +18,14 @@ For each communication chunk:
 - compute overall mean validation RMSE across households
 """
 
-# =========================
-# PATHS
-# =========================
+#paths
 DATA_PATH = Path("../data_files/final_locked_100_normalised.parquet")
 MAX_MIN_PATH = Path("../data_files/global_weather_scaler.csv")
 LOCAL_KWH_SCALING = Path("../data_files/local_kwh_scaler.csv")
 
 ASSIGNMENT_FILE = Path("kmeans_assignments_rowu_k4.csv")
 
-# cluster checkpoint folders from your clustered training runs
+#cluster checkpoint folders from clustered training runs
 CLUSTER_CHECKPOINT_DIRS = {
     0: Path("chunk_checkpoints_cluster_0"),
     1: Path("chunk_checkpoints_cluster_1"),
@@ -37,9 +35,7 @@ CLUSTER_CHECKPOINT_DIRS = {
 
 NUM_CHUNKS = 40
 
-# =========================
-# FORECAST SETTINGS
-# =========================
+#setttings
 HORIZON = 6
 WINDOW_SIZE = 24
 TARGET_COL = "kwh"
@@ -52,18 +48,14 @@ FEATURE_COLS = [
     "weekend", "temperature", "humidity"
 ]
 
-# =========================
-# LOAD DATA
-# =========================
+#load data
 df, local_kwh_scaler_df, global_temp_min, global_temp_max, global_hum_min, global_hum_max = (
     Helper_functions.load_data(DATA_PATH, MAX_MIN_PATH, LOCAL_KWH_SCALING)
 )
 
 house_ids = sorted(df["LCLid"].astype(str).unique())
 
-# =========================
-# LOAD CLUSTER ASSIGNMENTS
-# =========================
+#load cluster assignments
 assignments_df = pd.read_csv(ASSIGNMENT_FILE)
 assignments_df["house_id"] = assignments_df["house_id"].astype(str)
 
@@ -85,9 +77,7 @@ if missing_assignments:
 clusters_in_assignments = sorted(assignments_df["cluster"].unique())
 print("Clusters found:", clusters_in_assignments)
 
-# =========================
-# PREP VALIDATION DATA
-# =========================
+#prepare validation data for each house
 val_data = {}
 
 for i, house_id in enumerate(house_ids, start=1):
@@ -117,9 +107,7 @@ for i, house_id in enumerate(house_ids, start=1):
 
 print("Number of houses in val_data:", len(val_data))
 
-# =========================
-# SCREEN CHUNKS
-# =========================
+#screen validation performance per chunk
 chunk_val_metrics = {}
 chunk_cluster_metrics = []
 
@@ -193,9 +181,7 @@ for chunk_idx in range(1, NUM_CHUNKS + 1):
     import gc
     gc.collect()
 
-# =========================
-# SAVE RESULTS
-# =========================
+#save results
 summary_df = pd.DataFrame(chunk_cluster_metrics)
 summary_df["model"] = "LSTM64x32_clustered_federated"
 summary_df.to_csv("chunk_validation_results_clustered.csv", index=False)
@@ -206,9 +192,7 @@ best_rmse = float(summary_df["overall_mean_rmse_kwh"].min())
 print("\nBest chunk:", best_chunk)
 print("Best overall mean RMSE:", best_rmse)
 
-# =========================
-# PLOT
-# =========================
+#plot
 plt.figure(figsize=(10, 6))
 plt.plot(summary_df["chunk"], summary_df["overall_mean_rmse_kwh"], marker="o", label="Overall")
 

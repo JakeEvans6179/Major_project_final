@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 Plot the 24 hour average profiles of all households within each cluster, for k=2, k=3, k=4
 '''
 
-# Load raw 24D profiles
+#Load raw 24D profiles
 hourly_profiles = pd.read_csv("household_24h_train_profiles_raw.csv")
 features = [f"h{i:02d}" for i in range(24)]
 
@@ -24,11 +24,11 @@ for k in [2, 3, 4]:
     for ax, cluster_id in zip(axes, cluster_ids):
         cluster_df = df_merged[df_merged["cluster"] == cluster_id]
 
-        # plot each household profile faintly
+        #plot each household profile in background
         for _, row in cluster_df.iterrows():
             ax.plot(range(24), row[features].values, alpha=0.2, linewidth=1)
 
-        # plot cluster mean profile
+        #plot cluster mean profile
         mean_profile = cluster_df[features].mean()
         ax.plot(range(24), mean_profile.values, linewidth=3, label=f"Mean profile")
 

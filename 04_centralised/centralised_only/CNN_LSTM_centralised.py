@@ -19,7 +19,7 @@ CNN-lstm centralised validation screening on final cohort
 '''
 
 plots_dir = Path("train_val_curve")
-plots_dir.mkdir(exist_ok=True) # This creates the folder if it doesn't exist
+plots_dir.mkdir(exist_ok=True)
 
 
 data_path = Path("../../03_feature_engineering/final_locked_100_normalised.parquet")
@@ -115,6 +115,7 @@ for i, house_id in enumerate(house_ids, start = 1):
     kwh_min, kwh_max = Helper_functions.extract_kwh(local_kwh_scaler_df, house_id)
     train_df, val_df, test_df = Helper_functions.get_house_split(df, house_id, feature_cols)
 
+    #get x and y for train and val sets, using helper function to create windows and targets for each house, with specified window size and horizon
     house_x_train, house_y_train = Helper_functions.make_xy(train_df, window_size=WINDOW_SIZE, target_col=TARGET_COL, horizon = HORIZON)
     house_x_val, house_y_val = Helper_functions.make_xy(val_df, window_size=WINDOW_SIZE, target_col=TARGET_COL, horizon = HORIZON)
     
@@ -162,12 +163,12 @@ random.seed(69)
 model, history = train_model(x_train_global, y_train_global, x_val_global, y_val_global)
 
 
-# Plot the learning curve using the history object
+#plot learning curve
 plt.figure(figsize=(10, 6))
 plt.plot(history.history['loss'], label='Training Loss (MSE)')
 plt.plot(history.history['val_loss'], label='Validation Loss (MSE)')
 
-# Optional: Draw a vertical line where the best epoch was (before early stopping patience)
+#vetical line for best epoch
 best_epoch_idx = int(np.argmin(history.history["val_loss"]))
 best_epoch = best_epoch_idx + 1
 plt.axvline(x=best_epoch_idx, color='red', linestyle='--', label=f'Best Epoch ({best_epoch})')
@@ -178,7 +179,7 @@ plt.ylabel('Mean Squared Error')
 plt.legend()
 plt.grid(True, alpha=0.3)
 
-# Save to the directory you created earlier
+#save plot
 plt.savefig(plots_dir / "centralised_CNN_LSTM_learning_curve.png", dpi=200)
 plt.close()
 

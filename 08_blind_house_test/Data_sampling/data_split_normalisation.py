@@ -23,18 +23,11 @@ df = pd.read_parquet(hourly_path)
 df["DateTime"] = pd.to_datetime(df["DateTime"], errors="coerce")
 df = df.sort_values(["LCLid", "DateTime"]).reset_index(drop=True)
 
-# --------------------------------------------------
-# FIXED 14-DAY WINDOW
-# Choose ONE of these
-# --------------------------------------------------
+#fixed 14 day window
 
-# Option A: first two weeks of 2012
+#first two weeks of dataset
 WINDOW_START = pd.Timestamp("2012-01-01 00:00:00")
-WINDOW_END   = pd.Timestamp("2012-01-15 00:00:00")   # exclusive
-
-# Option B: if you really want to start later, uncomment this instead
-# WINDOW_START = pd.Timestamp("2012-01-10 00:00:00")
-# WINDOW_END   = pd.Timestamp("2012-01-24 00:00:00")   # exclusive
+WINDOW_END   = pd.Timestamp("2012-01-15 00:00:00")   
 
 window_df = df[
     (df["DateTime"] >= WINDOW_START) &
@@ -46,9 +39,7 @@ print("Window end:", WINDOW_END)
 print("Windowed shape:", window_df.shape)
 print("Unique houses:", window_df["LCLid"].nunique())
 
-# --------------------------------------------------
-# SPLIT CONFIG
-# --------------------------------------------------
+#split into train/val/test by time, not random, to simulate real forecasting scenario
 TRAIN_DAYS = 5
 VAL_DAYS = 2
 TEST_DAYS = 7
@@ -64,9 +55,7 @@ print("Train hours:", TRAIN_LEN)
 print("Val hours:", VAL_LEN)
 print("Test hours:", TEST_LEN)
 
-# --------------------------------------------------
-# SPLIT + SCALERS
-# --------------------------------------------------
+#get split and min-max values per house, then combine
 house_splits = {}
 house_kwh_scalers = []
 all_train_temp = []
@@ -129,9 +118,7 @@ if global_temp_max == global_temp_min:
 if global_hum_max == global_hum_min:
     raise ValueError("Global humidity min and max are equal")
 
-# --------------------------------------------------
-# MIN-MAX SCALE
-# --------------------------------------------------
+#apply scaling
 def minmax_scale(series, min_val, max_val):
     return (series - min_val) / (max_val - min_val)
 
@@ -143,7 +130,7 @@ for house_id in house_ids:
         house_kwh_scalers["house_id"] == house_id, "kwh_max"
     ].item()
 
-    # kwh: local per-house scaler from train only
+    #kwh: local per-house scaler from train only
     for split in ["train", "val", "test"]:
         house_splits[house_id][split]["kwh"] = minmax_scale(
             house_splits[house_id][split]["kwh"],
@@ -151,7 +138,7 @@ for house_id in house_ids:
             house_kwh_max
         )
 
-    # weather: global scaler from all train rows only
+    #weather: global scaler from all train rows only
     for split in ["train", "val", "test"]:
         house_splits[house_id][split]["temperature"] = minmax_scale(
             house_splits[house_id][split]["temperature"],
@@ -164,9 +151,7 @@ for house_id in house_ids:
             global_hum_max
         )
 
-# --------------------------------------------------
-# COMBINE + SAVE
-# --------------------------------------------------
+#combine splits into one df and save
 rows = []
 
 for house_id in house_ids:

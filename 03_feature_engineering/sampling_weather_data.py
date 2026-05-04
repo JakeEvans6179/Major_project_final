@@ -2,16 +2,16 @@ import pandas as pd
 from pathlib import Path
 
 '''
-**Step 2**
+**Step 1**
 Extract weather data and clean/ apply forward filling
 '''
-# folder containing all partitioned CSVs
+#weather data csvs
 data_folder = Path("../data/weather_data")
 WINDOW_DURATION = 789
 
 out_parquet = Path("weather_data.parquet")
 
-# find all csv files recursively
+#find all csv files in folder
 csv_files = sorted(data_folder.rglob("*.csv"))
 print(f"Found {len(csv_files)} CSV files")
 
@@ -25,11 +25,11 @@ for i, f in enumerate(csv_files, start=1):
         usecols=["ob_time", "air_temperature", "rltv_hum"],
         low_memory=False,
         skiprows=283
-    )
+    )   #get columns we want, skip the first 283 rows containing metadata
 
     temp = temp.rename(columns={"air_temperature": "temperature", "rltv_hum": "humidity", "ob_time": "DateTime"})
 
-    # convert types
+    #convert data types, turn errors into NaN
     temp["DateTime"] = pd.to_datetime(temp["DateTime"], errors="coerce")  #make the format same as energy dataset
     temp["temperature"] = pd.to_numeric(temp["temperature"], errors="coerce")
     temp["humidity"] = pd.to_numeric(temp["humidity"], errors="coerce")
@@ -37,14 +37,14 @@ for i, f in enumerate(csv_files, start=1):
     print(temp.tail())
     dfs.append(temp)
 
-# combine into one dataframe
+#combine into one dataframe
 all_weather = pd.concat(dfs, ignore_index=True)
 
 
 print("Rows before dropping NaT:", len(all_weather))
 print("NaT rows:", all_weather["DateTime"].isna().sum())
 
-all_weather = all_weather.dropna(subset=["DateTime"]).copy()    #drop any rows with invalid time
+all_weather = all_weather.dropna(subset=["DateTime"]).copy()    #drop rows with invalid time
 
 print("Rows after dropping NaT:", len(all_weather))
 
@@ -67,14 +67,14 @@ off_grid_rows = all_weather[~on_grid_mask].copy()
 print("Off-grid rows found:", len(off_grid_rows))
 print(off_grid_rows.head(20))
 
-# drop all off-grid rows globally
+#drop all off-grid rows globally
 all_weather = all_weather[on_grid_mask].copy()
 
 print("Rows after dropping off-grid rows:", len(all_weather))
 
 print(all_weather)
 
-#compute coverage for visualisation
+#compute coverage to check quality
 common_end = pd.Timestamp("2014-02-28 00:00:00")
 common_start = pd.Timestamp("2012-01-01 00:00:00")
 
@@ -114,7 +114,7 @@ print(window_stats) #current dataset --> 1 missing timestamp, 3 missing temp and
 #add in missing timestamp and apply forward filling for temp and humidity
 
 
-expected_index = pd.date_range(start=common_start, end=common_end - pd.Timedelta(hours=1), freq="h")    #remove last hour as demand data only goes up to 2014-02-27 23:00:00 after resampling
+expected_index = pd.date_range(start=common_start, end=common_end - pd.Timedelta(hours=1), freq="h")    #remove last hour as demand data only goes up to 2014-02-27 23:00:00 after hourly aggregation
 
 missing_times = expected_index.difference(window_weather["DateTime"])
 
@@ -151,7 +151,7 @@ assert len(weather_full) == expected_timesteps
 assert weather_full["temperature"].isna().sum() == 0
 assert weather_full["humidity"].isna().sum() == 0
 
-weather_full.to_parquet(out_parquet, index=False)
+weather_full.to_parquet(out_parquet, index=False)   #save processed weather data to parquet file
 print(f"\nSaved processed hourly data to: {out_parquet}")
 
 print("Final row count:", len(weather_full))

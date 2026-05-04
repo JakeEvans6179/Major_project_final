@@ -134,9 +134,6 @@ for i, house_id in enumerate(house_ids, start = 1):
         max_val=kwh_max
     )
 
-
-
-    
     #train model
     fine_tuned_model, history = train_model(house_x_train, house_y_train, house_x_val, house_y_val, starting_model)
 

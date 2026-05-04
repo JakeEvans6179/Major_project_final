@@ -47,8 +47,6 @@ feature_cols = [
     "weekend", "temperature", "humidity"
 ]
 
-
-
 #build model and compiler
 def compile_for_finetuning(model):
     
@@ -59,8 +57,6 @@ def compile_for_finetuning(model):
         metrics=[tf.keras.metrics.RootMeanSquaredError()]
     )
     return model
-
-
 
 def train_model(X_train, y_train, X_val, y_val, global_model):
     model = compile_for_finetuning(global_model)
@@ -82,9 +78,6 @@ def train_model(X_train, y_train, X_val, y_val, global_model):
     )
 
     return model, history
-
-
-
 
 df, local_kwh_scaler_df, global_temp_min, global_temp_max, global_hum_min, global_hum_max = Helper_functions.load_data(data_path, max_min_path, local_kwh_scaling)   #load global weather scalers and local kwh scalers
 house_ids = sorted(df["LCLid"].unique())
@@ -108,8 +101,6 @@ for i, house_id in enumerate(house_ids, start = 1):
 
     starting_model = load_model(global_model_path)   #copy model so starting weights are not changed for next house
 
-
-
     kwh_min, kwh_max = Helper_functions.extract_kwh(local_kwh_scaler_df, house_id)
     train_df, val_df, test_df = Helper_functions.get_house_split(df, house_id, feature_cols)
 
@@ -119,9 +110,6 @@ for i, house_id in enumerate(house_ids, start = 1):
     if len(house_x_train) == 0 or len(house_x_val) == 0:
         print(f"Skipping {house_id}: insufficient samples after windowing")
         continue
-
-
-    
 
     #run inference on global model
     pred_scaled_centralised = starting_model.predict(house_x_val, verbose=0) #run inference
@@ -133,10 +121,7 @@ for i, house_id in enumerate(house_ids, start = 1):
         min_val=kwh_min,
         max_val=kwh_max
     )
-
-
-
-    
+   
     #train model
     fine_tuned_model, history = train_model(house_x_train, house_y_train, house_x_val, house_y_val, starting_model)
 
@@ -153,7 +138,6 @@ for i, house_id in enumerate(house_ids, start = 1):
 
     delta_rmse = centralised_metrics['mean_rmse_across_horizons'] - fine_tuned_metrics["mean_rmse_across_horizons"]
     delta_mae = centralised_metrics["mean_mae_across_horizons"] - fine_tuned_metrics["mean_mae_across_horizons"]
-
 
     results.append({
         "house_id": house_id,
@@ -183,7 +167,6 @@ print("Median RMSE across horizons fine tuned:", results_df["fine_tuned_mean_rms
 print("Mean MAE across horizons fine tuned:", results_df["fine_tuned_mean_mae"].mean())
 print("Median MAE across horizons fine tuned:", results_df["fine_tuned_mean_mae"].median())
 
-
 print("Mean delta RMSE across horizons:", results_df["delta_rmse"].mean())
 print("Median delta RMSE across horizons:", results_df["delta_rmse"].median())
 
@@ -195,8 +178,6 @@ print("Houses worsened in RMSE:", (results_df["delta_rmse"] < 0).sum())
 
 print("Houses improved in MAE:", (results_df["delta_mae"] > 0).sum())
 print("Houses worsened in MAE:", (results_df["delta_mae"] < 0).sum())
-
-
 
 summary_df = pd.DataFrame([{
     "model": "fine_tuned_S2S",
@@ -216,12 +197,7 @@ summary_df = pd.DataFrame([{
     "Median delta MAE across horizons": results_df["delta_mae"].median(),
 
     "Mean epochs run": results_df["epochs_run"].mean(),
-    "Mean best epoch": results_df["best_epoch"].mean()
-
-
-
-
-    
+    "Mean best epoch": results_df["best_epoch"].mean()    
 }])
 
 summary_df.to_csv("fine_tuned_S2S_summary.csv", index=False)

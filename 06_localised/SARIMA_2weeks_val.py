@@ -10,7 +10,6 @@ from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 import Helper_functions
 
-
 """
 SARIMA 6-hour benchmark for household load forecasting
 
@@ -26,7 +25,7 @@ Workflow:
    - evaluate on validation using rolling recursive 6-step forecasts
 3. Save per-house results, candidate search results, summary CSV, and plots
 
-2 week validation window parameter choosing test
+2 week validation window parameter choosing 
 """
 
 
@@ -45,7 +44,7 @@ HORIZON = 6
 # Use 2 weeks of validation for candidate search
 VAL_SEARCH_HOURS = 24 * 14
 
-# Candidate grid
+#pdq values for SARIMA grid search
 p_values = [0, 1]
 d_values = [0, 1]
 q_values = [0, 1]
@@ -54,7 +53,6 @@ P_values = [0, 1]
 D_value = 1
 Q_values = [0, 1]
 SEASONAL_PERIOD = 24
-
 
 def evaluate_raw_predictions_multistep(y_true, y_pred):
     """
@@ -86,7 +84,6 @@ def evaluate_raw_predictions_multistep(y_true, y_pred):
     metrics["mean_mae_across_horizons"] = float(np.mean(mae_list))
 
     return metrics
-
 
 def get_house_raw_target_splits(df, house_id, kwh_min, kwh_max):
     house_df = (
@@ -123,7 +120,6 @@ def get_house_raw_target_splits(df, house_id, kwh_min, kwh_max):
 
     return train_series, val_series
 
-
 def build_candidate_grid():
     candidates = []
     for p in p_values:
@@ -135,7 +131,6 @@ def build_candidate_grid():
                         seasonal_order = (P, D_value, Q, SEASONAL_PERIOD)
                         candidates.append((order, seasonal_order))
     return candidates
-
 
 def fit_sarima(train_series, order, seasonal_order):
     model = SARIMAX(
@@ -166,8 +161,8 @@ def rolling_multi_step_forecast(fitted_res, eval_series, horizon=6):
     Rolling recursive multi-step forecast.
 
     At each origin:
-    - forecast next `horizon` steps
-    - store the true next `horizon` values
+    - forecast next horizon steps
+    - store the true next horizon values
     - update the model with the actual next observation only
     - continue
 
@@ -190,7 +185,7 @@ def rolling_multi_step_forecast(fitted_res, eval_series, horizon=6):
         forecast = current_res.forecast(steps=horizon)
         forecast = np.asarray(forecast, dtype=float)
 
-        # Physical constraint: demand cannot be negative
+        #clip values, demand can't be negvative
         forecast = np.clip(forecast, a_min=0, a_max=None)
 
         true_future = eval_values[i:i + horizon]
@@ -198,7 +193,7 @@ def rolling_multi_step_forecast(fitted_res, eval_series, horizon=6):
         y_pred.append(forecast)
         y_true.append(true_future)
 
-        # Update with actual next single observation only
+        #update model with actual next observation only (recursive forecasting)
         current_res = current_res.extend(np.asarray([eval_values[i]], dtype=float))
 
     return np.array(y_true), np.array(y_pred)
@@ -307,9 +302,7 @@ def search_best_sarima(train_series, val_series_search, house_id=None):
     return best, search_df
 
 
-# ============================================================
-# Main benchmark loop
-# ============================================================
+#main loop
 
 df, local_kwh_scaler_df, global_temp_min, global_temp_max, global_hum_min, global_hum_max = (
     Helper_functions.load_data(data_path, max_min_path, local_kwh_scaling)
@@ -455,10 +448,8 @@ for i, house_id in enumerate(house_ids, start=1):
                 index=False
             )
 
-# ============================================================
-# Save outputs
-# ============================================================
 
+#save outputs
 results_df = pd.DataFrame(results)
 
 if results_df.empty:

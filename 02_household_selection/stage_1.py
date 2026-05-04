@@ -7,18 +7,18 @@ from pathlib import Path
 load eligible houses, check against hard filters, sample 100, and plot for manual check
 '''
 
-# --- 1. CONFIGURATION ---
+#get raw elgible households data
 data_path = Path("../01_data_preparation/eligible_households_raw.parquet")
 plots_dir = Path("stage1_qa_plots")
 plots_dir.mkdir(exist_ok=True)
 SEED = 6769
 
-# --- 2. LOAD DATA ---
+#load data
 print("Loading raw dataset...")
 df = pd.read_parquet(data_path)
 df["DateTime"] = pd.to_datetime(df["DateTime"])
 
-# --- 3. CALCULATE THE 4 HARD RULES ---
+#calculate metrics for filtering step later 
 print("Calculating hardware and physical heuristics...")
 house_stats = df.groupby("LCLid").agg(
     total_readings=("kwh", "count"),
@@ -30,34 +30,34 @@ house_stats = df.groupby("LCLid").agg(
 
 house_stats["zeros_ratio"] = house_stats["zeros_count"] / house_stats["total_readings"]
 
-# literature inspired occupancy rules
+#hard filter rules
 valid_houses_df = house_stats[
-    (house_stats["zeros_ratio"] <= 0.05) &      # Rule 1: No prolonged grid disconnection
-    (house_stats["std_kwh"] >= 0.05) &          # Rule 2: Must have active human variance
-    (house_stats["max_kwh"] <= 10.0) &          # Rule 3: No impossible fuse-blowing spikes
-    (house_stats["unique_values"] > 500)        # Rule 4: No stuck/looping sensors
+    (house_stats["zeros_ratio"] <= 0.05) &      #no long grid disconnection
+    (house_stats["std_kwh"] >= 0.05) &          #needs plausible variability
+    (house_stats["max_kwh"] <= 10.0) &          #implausible high readings, may show faulty sensor/ data issues
+    (house_stats["unique_values"] > 500)        #no stuck readings, needs some varaibility in data values
 ].copy()
 
 print(f"\nTotal Houses Analyzed: {len(house_stats)}")
 print(f"Houses Surviving Hard Filters: {len(valid_houses_df)}")
 
 valid_houses_df = valid_houses_df.sort_values("LCLid").reset_index(drop=True)
-#sample 
+#sample 100 random households
 rng = np.random.default_rng(seed=SEED)
 
 if len(valid_houses_df) < 100:
-    raise ValueError("Not enough houses passed the hard filters!")
+    raise ValueError("less than 100 sampled households")
 
 #sort by ascending order of houseid
 initial_100_ids = sorted(rng.choice(valid_houses_df["LCLid"].to_numpy(), size=100, replace=False))
 print(f"\nSampled initial 100 households (Seed: {SEED}).")
 
 
-pd.DataFrame({"LCLid": initial_100_ids}).to_csv("stage1_initial_100.csv", index=False)
+pd.DataFrame({"LCLid": initial_100_ids}).to_csv("stage1_initial_100.csv", index=False)  #save ids to csv
 print("Saved initial list to 'stage1_initial_100.csv'.")
 
 #plot for manual check
-print(f"\nGenerating QA plots for visual inspection...")
+print(f"\nplotting for visual inspection")
 final_raw_df = df[df["LCLid"].isin(initial_100_ids)].copy()
 
 for i, house_id in enumerate(initial_100_ids, start=1):
@@ -75,7 +75,7 @@ for i, house_id in enumerate(initial_100_ids, start=1):
     plt.close()
     
     if i % 10 == 0 or i == len(initial_100_ids):
-        print(f"Plotted {i}/{len(initial_100_ids)} houses...")
+        print(f"Plotted {i}/{len(initial_100_ids)} houses")
 
 print("Done")
 

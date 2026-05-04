@@ -18,16 +18,14 @@ For each communication chunk:
 - compute overall mean validation RMSE across households
 """
 
-# =========================
-# PATHS
-# =========================
+#paths
 DATA_PATH = Path("../data_files/final_locked_100_normalised.parquet")
 MAX_MIN_PATH = Path("../data_files/global_weather_scaler.csv")
 LOCAL_KWH_SCALING = Path("../data_files/local_kwh_scaler.csv")
 
 ASSIGNMENT_FILE = Path("kmeans_assignments_rowu_k2.csv")
 
-# cluster checkpoint folders from your clustered training runs
+#cluster checkpoint folders from clustered FL training runs
 CLUSTER_CHECKPOINT_DIRS = {
     0: Path("chunk_checkpoints_cluster_0"),
     1: Path("chunk_checkpoints_cluster_1"),
@@ -35,9 +33,7 @@ CLUSTER_CHECKPOINT_DIRS = {
 
 NUM_CHUNKS = 40
 
-# =========================
-# FORECAST SETTINGS
-# =========================
+#settings
 HORIZON = 6
 WINDOW_SIZE = 24
 TARGET_COL = "kwh"
@@ -50,18 +46,14 @@ FEATURE_COLS = [
     "weekend", "temperature", "humidity"
 ]
 
-# =========================
-# LOAD DATA
-# =========================
+#load data
 df, local_kwh_scaler_df, global_temp_min, global_temp_max, global_hum_min, global_hum_max = (
     Helper_functions.load_data(DATA_PATH, MAX_MIN_PATH, LOCAL_KWH_SCALING)
 )
 
 house_ids = sorted(df["LCLid"].astype(str).unique())
 
-# =========================
-# LOAD CLUSTER ASSIGNMENTS
-# =========================
+#load cluster assignments
 assignments_df = pd.read_csv(ASSIGNMENT_FILE)
 assignments_df["house_id"] = assignments_df["house_id"].astype(str)
 
@@ -83,9 +75,7 @@ if missing_assignments:
 clusters_in_assignments = sorted(assignments_df["cluster"].unique())
 print("Clusters found:", clusters_in_assignments)
 
-# =========================
-# PREP VALIDATION DATA
-# =========================
+#validation data
 val_data = {}
 
 for i, house_id in enumerate(house_ids, start=1):
@@ -115,9 +105,7 @@ for i, house_id in enumerate(house_ids, start=1):
 
 print("Number of houses in val_data:", len(val_data))
 
-# =========================
-# SCREEN CHUNKS
-# =========================
+#loop through communication chunks, load cluster models, evaluate on validation data
 chunk_val_metrics = {}
 chunk_cluster_metrics = []
 
@@ -125,7 +113,7 @@ for chunk_idx in range(1, NUM_CHUNKS + 1):
     print(f"\n=== Evaluating chunk {chunk_idx}/{NUM_CHUNKS} ===")
     tf.keras.backend.clear_session()
 
-    # load one model per cluster for this chunk
+    #load one model per cluster for this chunk
     cluster_models = {}
 
     for cluster_id in clusters_in_assignments:
@@ -143,7 +131,7 @@ for chunk_idx in range(1, NUM_CHUNKS + 1):
     overall_house_metrics = []
     per_cluster_house_metrics = {cluster_id: [] for cluster_id in clusters_in_assignments}
 
-    # evaluate each household using its own cluster model
+    #evaluate each household using its own cluster model
     for house_id, house_info in val_data.items():
         cluster_id = house_info["cluster"]
         model = cluster_models[cluster_id]
@@ -162,7 +150,7 @@ for chunk_idx in range(1, NUM_CHUNKS + 1):
         overall_house_metrics.append(house_rmse)
         per_cluster_house_metrics[cluster_id].append(house_rmse)
 
-    # overall mean across households
+    #overall mean across households
     mean_val_rmse = float(np.mean(overall_house_metrics))
     chunk_val_metrics[chunk_idx] = mean_val_rmse
 
@@ -186,14 +174,12 @@ for chunk_idx in range(1, NUM_CHUNKS + 1):
             f"(n={row[f'cluster_{cluster_id}_n_houses']})"
         )
 
-    # cleanup
+    #cleanup
     del cluster_models
     import gc
     gc.collect()
 
-# =========================
-# SAVE RESULTS
-# =========================
+#save outputs
 summary_df = pd.DataFrame(chunk_cluster_metrics)
 summary_df["model"] = "LSTM64x32_clustered_federated"
 summary_df.to_csv("chunk_validation_results_clustered.csv", index=False)
@@ -204,9 +190,7 @@ best_rmse = float(summary_df["overall_mean_rmse_kwh"].min())
 print("\nBest chunk:", best_chunk)
 print("Best overall mean RMSE:", best_rmse)
 
-# =========================
-# PLOT
-# =========================
+#plot validation RMSE vs chunks
 plt.figure(figsize=(10, 6))
 plt.plot(summary_df["chunk"], summary_df["overall_mean_rmse_kwh"], marker="o", label="Overall")
 
